@@ -18,7 +18,7 @@
           enHighLevel: 1
         stabilizer:
           estimator: 2 # 1: complementary, 2: kalman
-          controller: 2 # 1: PID, 2: mellinger
+          controller: 1 # 1: PID, 2: mellinger
         ring:
           effect: 16 # 6: double spinner, 7: solid color, 16: packetRate
           solidBlue: 255 # if set to solid color
@@ -32,7 +32,7 @@
           resetEstimation: 1
       # tracking
       motion_capture_type: "optitrack" # one of none,vicon,optitrack,optitrack_closed_source,qualisys,vrpn
-      object_tracking_type: "libobjecttracker" # one of motionCapture,libobjecttracker
+      object_tracking_type: "motionCapture" # one of motionCapture,libobjecttracker
       send_position_only: False # set to False to send position+orientation; set to True to send position only
       motion_capture_host_name: "optitrackPC"
       # motion_capture_interface_ip: "" # optional for optitrack with multiple interfaces
