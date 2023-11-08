@@ -60,8 +60,8 @@ with open(json_path, "r", encoding="utf-8") as config_file:
                     [SAMPLING_TIME, 0, 0], \
                     [0, SAMPLING_TIME, 0], \
                     [0, 0, SAMPLING_TIME]])
-    TAKEOFF_DURATION = 2.0
-    HOVER_DURATION = 2.0
+    TAKEOFF_DURATION = 5.0
+    HOVER_DURATION = 5.0
 
 # %% Import Crazyflie
 # Then we can import Crazyswarm lib
@@ -155,7 +155,11 @@ if __name__ == "__main__":
     data = []
 
     # %% Takeoff
-    """TO BE TESTED"""
+    """
+    
+    Takeoff operation is needed due to ground effect.
+    
+    """
     swarm.allcfs.takeoff(targetHeight=1.0, duration=TAKEOFF_DURATION)
     timeHelper.sleep(TAKEOFF_DURATION)
 
@@ -165,12 +169,21 @@ if __name__ == "__main__":
     for id in ID_LIST:
         state[id][:3] = cfs[id].position()
 
-    """TO BE TESTED"""
-    # # Stabilizing all CFs at initial position after takeoff
-    # while timeHelper.time() - init_time < HOVER_DURATION:
-    #     for id in ID_LIST:
-    #         cfs[id].cmdPosition(initial_positions[id])
-    #     timeHelper.sleep(SAMPLING_TIME)
+    # Stabilizing all CFs at initial position after takeoff
+    """
+    
+    After takeoff, agents usually have a non-zero velocity which may disturb the system at start.
+    The following block seeks to override initial velocities, making the system start from rest conditions.
+
+    Both goTo() and cmdPosition() methods where tested. The goTo() method work better considering the further
+    application of the land() method.
+    
+    """
+    while timeHelper.time() - init_time < HOVER_DURATION:
+        for id in ID_LIST:
+            cfs[id].goTo(state[id][:3], yaw=0, duration=HOVER_DURATION)
+            # cfs[id].cmdPosition(state[id][:3]) # Tests indicate bad results before land()
+        timeHelper.sleep(SAMPLING_TIME)
 
     # Establishing sample time for numerical derivative
     spent_time = 0
@@ -208,7 +221,21 @@ if __name__ == "__main__":
     #     cf.cmdVelocityWorld(kp*(ref - cf.position()), yawRate=0)
     #     timeHelper.sleep(SAMPLING_TIME)
 
+    # %% Landing
+     """
+     
+     Tests indicated that landing command sometimes get passed by.
+     Therefore, the following block will check the swarm distance to the ground after the landing order.
+     If any agent fails to land, the order will be resent.
+     
+     Still in observation. Cases of ignored landing commands are not easily reproduced.
+     
+     """
     print("Landing...")
-    swarm.allcfs.land(targetHeight=0.04, duration=2.5)
-    timeHelper.sleep(TAKEOFF_DURATION)
+    while any(state[id][2] > 0.1 for id in ID_LIST):
+        swarm.allcfs.land(targetHeight=0.04, duration=2.5)
+        timeHelper.sleep(TAKEOFF_DURATION)
+        state = np.zeros((ID_LIST_SIZE, 6))
+        for id in ID_LIST:
+            state[id][:3] = cfs[id].position()
     print("Landed.")
