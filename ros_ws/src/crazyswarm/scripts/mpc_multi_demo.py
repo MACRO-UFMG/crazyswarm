@@ -15,7 +15,7 @@ from utils import *
 # Keep track of the file path
 file_path = os.path.dirname(os.path.realpath(__file__))
 # Load experiment configs from /collision-avoidance/scripts
-json_path = os.path.join(file_path, "config2.json")
+json_path = os.path.join(file_path, "config.json")
 
 # %% Load JSON
 with open(json_path, "r", encoding="utf-8") as config_file:
@@ -109,7 +109,7 @@ def follow_field(id, state, time, vector_field):
         print("[SAFETY] Escaped X limmits.")
         print(p)
         return 0, p
-    elif np.linalg.norm(p[1]) > 0.8:
+    elif np.linalg.norm(p[1]) > 0.9:
         print("[SAFETY] Escaped Y limmits.")
         print(p)
         return 0, p
@@ -188,49 +188,56 @@ if __name__ == "__main__":
     # Establishing sample time for numerical derivative
     spent_time = 0
     LAST_STEP_TIME = SAMPLING_TIME
+    status = np.array([None]*ID_LIST_SIZE)
     
     """TO BE TESTED"""
-    # while timeHelper.time() - init_time < SIMULATION_TIME:
-    #     loop_start = timeHelper.time()
+    while timeHelper.time() - init_time < SIMULATION_TIME:
+        loop_start = timeHelper.time()
 
-    #     state, current_time = compute_state(state, LAST_STEP_TIME)
-    #     for id in ID_LIST:
-    #         status = follow_field(id, state, current_time, vector_fields[id])
-    #     initial_position = last_p
+        state, current_time = compute_state(state, LAST_STEP_TIME)
+        for id in ID_LIST:
+            status[id] = follow_field(id, state, current_time, vector_fields[id])
         
-    #     loop_end = timeHelper.time()
-    #     spent_time = loop_end - loop_start
-    #     timeHelper.sleep(SAMPLING_TIME - spent_time)
-    #     post_sleep = timeHelper.time()
-    #     LAST_STEP_TIME = post_sleep - loop_start
-    #     print(LAST_STEP_TIME, post_sleep - init_time, status)
-    #     print()
+        loop_end = timeHelper.time()
+        spent_time = loop_end - loop_start
+        timeHelper.sleep(SAMPLING_TIME - spent_time)
+        post_sleep = timeHelper.time()
+        LAST_STEP_TIME = post_sleep - loop_start
+        print(LAST_STEP_TIME, post_sleep - init_time, status)
+        print()
 
-    #     if not status:
-    #         print("Exiting...")
-    #         break
+        if not all(status[ID_LIST]):
+            print("Exiting...")
+            break
 
-    # df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
-    # df.to_csv("experiment.csv", index=False)
+    df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
+    df.to_csv("experiment.csv", index=False)
 
-    # kp = 0.1
-    # ref = np.array([initial_position[0], initial_position[1], 0.0])
-    # while cf.position()[2] > 0.2:
-    #     print(cf.position()[2])
-    #     print("Stabilizing before landing...")
-    #     cf.cmdVelocityWorld(kp*(ref - cf.position()), yawRate=0)
+    """ ERASE MAYBE """
+    # landing_sites = [[state[id][0], state[id][1], 0.0] for id in range(ID_LIST_SIZE)]
+    # while any([cfs[id].position()[2] > .2]):
+    #     for id in ID_LIST:
+    #         cfs[id].goTo(landing_sites[id], yaw=0, duration=HOVER_DURATION)
     #     timeHelper.sleep(SAMPLING_TIME)
 
+    kp = 0.1
+    landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
+    while any([cfs[id].position()[2] > .35]):
+        print("Stabilizing before landing...")
+        for id in ID_LIST:
+            cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
+        timeHelper.sleep(SAMPLING_TIME)
+
     # %% Landing
-     """
-     
-     Tests indicated that landing command sometimes get passed by.
-     Therefore, the following block will check the swarm distance to the ground after the landing order.
-     If any agent fails to land, the order will be resent.
-     
-     Still in observation. Cases of ignored landing commands are not easily reproduced.
-     
-     """
+    """
+    
+    Tests indicated that landing command sometimes get passed by.
+    Therefore, the following block will check the swarm distance to the ground after the landing order.
+    If any agent fails to land, the order will be resent.
+    
+    Still in observation. Cases of ignored landing commands are not easily reproduced.
+    
+    """
     print("Landing...")
     while any(state[id][2] > 0.1 for id in ID_LIST):
         swarm.allcfs.land(targetHeight=0.04, duration=2.5)
