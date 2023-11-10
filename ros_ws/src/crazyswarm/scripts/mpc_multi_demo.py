@@ -92,7 +92,7 @@ def follow_field(id, state, time, vector_field):
         reference = computeReference(p, vector_field, H, time-init_time, SAMPLING_TIME)
     except Exception as error:
         print(error)
-        return 0, p
+        return 0
     
     mpc.set_reference(reference)
     state = np.concatenate((p, v))
@@ -101,22 +101,19 @@ def follow_field(id, state, time, vector_field):
         u = mpc.step(state)
     except Exception as error:
         print(error)
-        return 0, p
+        return 0
 
     cmd = v + u*SAMPLING_TIME
 
     if np.linalg.norm(p[0]) > 2:
         print("[SAFETY] Escaped X limmits.")
-        print(p)
-        return 0, p
+        return 0
     elif np.linalg.norm(p[1]) > 0.9:
         print("[SAFETY] Escaped Y limmits.")
-        print(p)
-        return 0, p
+        return 0
     elif p[2] > 2:
         print("[SAFETY] Escaped Z limmits.")
-        print(p)
-        return 0, p
+        return 0
     
     global DEBUG_VEL
     if not any(v):
@@ -126,9 +123,10 @@ def follow_field(id, state, time, vector_field):
         else:
             DEBUG_VEL = True
 
+    print(cmd)
     cfs[id].cmdVelocityWorld(cmd, yawRate=0)
         
-    return 1, p
+    return 1
 
 if __name__ == "__main__":
     swarm = Crazyswarm()
@@ -203,8 +201,8 @@ if __name__ == "__main__":
         timeHelper.sleep(SAMPLING_TIME - spent_time)
         post_sleep = timeHelper.time()
         LAST_STEP_TIME = post_sleep - loop_start
-        print(LAST_STEP_TIME, post_sleep - init_time, status)
-        print()
+        # print(LAST_STEP_TIME, post_sleep - init_time, status)
+        # print()
 
         if not all(status[ID_LIST]):
             print("Exiting...")
@@ -222,8 +220,8 @@ if __name__ == "__main__":
 
     kp = 0.1
     landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
+    print("Stabilizing before landing...")
     while any([cfs[id].position()[2] > .35]):
-        print("Stabilizing before landing...")
         for id in ID_LIST:
             cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
         timeHelper.sleep(SAMPLING_TIME)

@@ -8,7 +8,7 @@
     },
     "agent":{
         "RADIUS": 0.05,
-        "ID_LIST": [1, 5]
+        "ID_LIST": [3]
     },
     "vector_field":{
         "VR": 0.1,
@@ -16,11 +16,11 @@
         "arguments": ["s", "t"],
         "curves":[
             "None",
-            "np.array([-1 + 0.8*np.sin(s), 0.8*np.cos(s), 1. + 0*s]).T",
+            "np.array([-1 - 0.3*np.sin(s), 0.3*np.cos(s), 1.5 + 0*s]).T",
             "None",
+            "np.array([-1 - 0.3*np.sin(s), 0.3*np.cos(s), 1.5 + 0*s]).T",
             "None",
-            "None",
-            "np.array([-1 - 0.3*np.sin(s), 0.3*np.cos(s), 1.5 + 0*s]).T"
+            "np.array([-1 + 0.8*np.sin(s), 0.8*np.cos(s), 1. + 0*s]).T"
         ]
     },
     "mpc":{
