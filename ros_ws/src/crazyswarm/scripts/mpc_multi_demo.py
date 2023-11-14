@@ -15,7 +15,7 @@ from utils import *
 # Keep track of the file path
 file_path = os.path.dirname(os.path.realpath(__file__))
 # Load experiment configs from /collision-avoidance/scripts
-json_path = os.path.join(file_path, "config.json")
+json_path = os.path.join(file_path, "mpc_demo.json")
 
 # %% Load JSON
 with open(json_path, "r", encoding="utf-8") as config_file:
@@ -123,7 +123,8 @@ def follow_field(id, state, time, vector_field):
         else:
             DEBUG_VEL = True
 
-    print(cmd)
+    if np.linalg.norm(cmd) < .05:
+        print(cmd, time)
     cfs[id].cmdVelocityWorld(cmd, yawRate=0)
         
     return 1
@@ -180,7 +181,6 @@ if __name__ == "__main__":
     while timeHelper.time() - init_time < HOVER_DURATION:
         for id in ID_LIST:
             cfs[id].goTo(state[id][:3], yaw=0, duration=HOVER_DURATION)
-            # cfs[id].cmdPosition(state[id][:3]) # Tests indicate bad results before land()
         timeHelper.sleep(SAMPLING_TIME)
 
     # Establishing sample time for numerical derivative
@@ -188,7 +188,6 @@ if __name__ == "__main__":
     LAST_STEP_TIME = SAMPLING_TIME
     status = np.array([None]*ID_LIST_SIZE)
     
-    """TO BE TESTED"""
     while timeHelper.time() - init_time < SIMULATION_TIME:
         loop_start = timeHelper.time()
 
@@ -201,8 +200,6 @@ if __name__ == "__main__":
         timeHelper.sleep(SAMPLING_TIME - spent_time)
         post_sleep = timeHelper.time()
         LAST_STEP_TIME = post_sleep - loop_start
-        # print(LAST_STEP_TIME, post_sleep - init_time, status)
-        # print()
 
         if not all(status[ID_LIST]):
             print("Exiting...")
@@ -210,13 +207,6 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
     df.to_csv("experiment.csv", index=False)
-
-    """ ERASE MAYBE """
-    # landing_sites = [[state[id][0], state[id][1], 0.0] for id in range(ID_LIST_SIZE)]
-    # while any([cfs[id].position()[2] > .2]):
-    #     for id in ID_LIST:
-    #         cfs[id].goTo(landing_sites[id], yaw=0, duration=HOVER_DURATION)
-    #     timeHelper.sleep(SAMPLING_TIME)
 
     kp = 0.1
     landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
