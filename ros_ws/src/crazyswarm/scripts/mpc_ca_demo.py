@@ -71,7 +71,7 @@ with open(json_path, "r", encoding="utf-8") as config_file:
 # Then we can import Crazyswarm lib
 from pycrazyswarm import Crazyswarm
 
-DEBUG_VEL = False
+DEBUG_VEL = np.zeros(ID_LIST_SIZE)
 
 def compute_state(last_state, LAST_STEP_TIME):
     current_state = np.zeros((ID_LIST_SIZE, 6))
@@ -140,18 +140,21 @@ def follow_field(id, state, agents, time, vector_field):
         return 0
     
     global DEBUG_VEL
-    if not any(v):
-        if DEBUG_VEL:
+    print(v, v[v < 1e-4])
+    if all(np.linalg.norm(v[i]) < 1e-4 for i in range(len(v))):
+        if DEBUG_VEL[id] > 30:
             print("DEBUG_VEL")
-            return 0, p
+            return 0
         else:
-            DEBUG_VEL = True
+            DEBUG_VEL[id] += 1
+    else:
+        DEBUG_VEL[id] = 0
 
     if np.linalg.norm(cmd) < .05:
         print(cmd, time)
 
-    """DEBUGGING"""
-    # cfs[id].cmdVelocityWorld(cmd, yawRate=0)
+    """DEBUG CMD"""
+    cfs[id].cmdVelocityWorld(cmd, yawRate=0)
         
     return 1
 
@@ -200,9 +203,9 @@ if __name__ == "__main__":
     Takeoff operation is needed due to ground effect.
     
     """
-    """DEBUGGING"""
-    # swarm.allcfs.takeoff(targetHeight=1.0, duration=TAKEOFF_DURATION)
-    # timeHelper.sleep(TAKEOFF_DURATION)
+    """DEBUG CMD"""
+    swarm.allcfs.takeoff(targetHeight=1.0, duration=TAKEOFF_DURATION)
+    timeHelper.sleep(TAKEOFF_DURATION)
 
     # Acquiring initial positions from all CFs
     init_time = timeHelper.time()
@@ -222,8 +225,8 @@ if __name__ == "__main__":
     """
     while timeHelper.time() - init_time < HOVER_DURATION:
         for id in ID_LIST:
-            """DEBUGGING"""
-            # cfs[id].goTo(state[id][:3], yaw=0, duration=HOVER_DURATION)
+            """DEBUG CMD"""
+            cfs[id].goTo(state[id][:3], yaw=0, duration=HOVER_DURATION)
         timeHelper.sleep(SAMPLING_TIME)
 
     # Establishing sample time for numerical derivative
@@ -238,7 +241,6 @@ if __name__ == "__main__":
         state, current_time = compute_state(state, LAST_STEP_TIME)
         for id in ID_LIST:
             status[id] = follow_field(id, state, agents, current_time, vector_fields[id])
-            print(agents[id].position, agents[id].velocity)
         
         loop_end = timeHelper.time()
         spent_time = loop_end - loop_start
@@ -256,10 +258,10 @@ if __name__ == "__main__":
     kp = 0.1
     landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
     print("Stabilizing before landing...")
-    while any([cfs[id].position()[2] > .35]):
+    while any(cfs[id].position()[2] > .35 for id in ID_LIST):
         for id in ID_LIST:
-            """DEBUGGING"""
-            # cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
+            """DEBUG CMD"""
+            cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
         timeHelper.sleep(SAMPLING_TIME)
 
     # %% Landing
@@ -274,8 +276,8 @@ if __name__ == "__main__":
     """
     print("Landing...")
     while any(state[id][2] > 0.1 for id in ID_LIST):
-        """DEBUGGING"""
-        # swarm.allcfs.land(targetHeight=0.04, duration=2.5)
+        """DEBUG CMD"""
+        swarm.allcfs.land(targetHeight=0.04, duration=2.5)
         timeHelper.sleep(TAKEOFF_DURATION)
         state = np.zeros((ID_LIST_SIZE, 6))
         for id in ID_LIST:
