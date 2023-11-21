@@ -7,7 +7,7 @@
         "COLLISION_AVOIDANCE_METHOD": "orca"
     },
     "agent":{
-        "RADIUS": 0.3,
+        "RADIUS": 0.1,
         "ID_LIST": [1, 5]
     },
     "vector_field":{
@@ -16,15 +16,15 @@
         "arguments": ["s", "t"],
         "curves":[
             "None",
-            "np.array([-0.6*np.sin(s), 0.6*np.cos(s), 1.5 + 0*s]).T",
+            "np.array([-0.5 -0.6*np.sin(s), 0.6*np.cos(s), 1.0 + 0*s]).T",
             "None",
             "np.array([-1 - 0.3*np.sin(s), 0.3*np.cos(s), 1.5 + 0*s]).T",
             "None",
-            "np.array([ 0.6*np.sin(s), 0.6*np.cos(s), 1.5 + 0*s]).T"
+            "np.array([-0.5 +0.6*np.sin(s), 0.6*np.cos(s), 1.0 + 0*s]).T"
         ]
     },
     "mpc":{
-        "H": 20,
+        "H": 10,
         "ALPHA": 0.001
     },
     "collision_avoidance":{

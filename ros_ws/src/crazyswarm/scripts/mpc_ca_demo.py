@@ -47,6 +47,9 @@ with open(json_path, "r", encoding="utf-8") as config_file:
     H = mpc_config["H"]
     ALPHA = mpc_config["ALPHA"]
     Q = np.diag(np.ones(6))
+    Q[2][2] = 2
+    Q[5][5] = 2
+    print(Q)
     R = np.diag(ALPHA*np.ones(3))
     RDU = np.diag(ALPHA*np.ones(3))
     A = np.array([  [1, 0, 0, SAMPLING_TIME, 0, 0], \
@@ -256,9 +259,9 @@ if __name__ == "__main__":
     df.to_csv("experiment.csv", index=False)
 
     kp = 0.1
-    landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
+    landing_sites = [[state[id][0], state[id][1], 0.4] for id in range(ID_LIST_SIZE)]
     print("Stabilizing before landing...")
-    while any(cfs[id].position()[2] > .35 for id in ID_LIST):
+    while any(cfs[id].position()[2] > .45 for id in ID_LIST):
         for id in ID_LIST:
             """DEBUG CMD"""
             cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
