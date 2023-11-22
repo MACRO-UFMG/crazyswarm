@@ -1,0 +1,34 @@
+{
+    "experiment":{
+        "SAMPLING_TIME": 0.1,
+        "LANDING_HEIGHT": 0.04,
+        "SIMULATION_TIME": 60,
+        "CUBE_SIDE": 4,
+        "COLLISION_AVOIDANCE_METHOD": "orca"
+    },
+    "agent":{
+        "RADIUS": 0.2,
+        "ID_LIST": [1, 5]
+    },
+    "vector_field":{
+        "VR": 0.1,
+        "KF": 10,
+        "arguments": ["s", "t"],
+        "curves":[
+            "None",
+            "np.array([-0.5 -0.6*np.sin(s), 0.6*np.cos(s), 1.0 + 0*s]).T",
+            "None",
+            "np.array([-1 - 0.3*np.sin(s), 0.3*np.cos(s), 1.5 + 0*s]).T",
+            "None",
+            "np.array([-0.5 +0.6*np.sin(s), 0.6*np.cos(s), 1.0 + 0*s]).T"
+        ]
+    },
+    "mpc":{
+        "H": 20,
+        "ALPHA": 0.001
+    },
+    "collision_avoidance":{
+        "MAX_ACC": 50,
+        "GAMMA": 0.1
+    }
+}

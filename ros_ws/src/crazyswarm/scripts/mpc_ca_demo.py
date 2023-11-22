@@ -98,6 +98,30 @@ def follow_field(id, state, agents, time, vector_field):
 
     p = state[id][:3]
     v = state[id][3:]
+
+    # %% Safety Checkup
+    # Checks if inside the safe zone
+    if np.linalg.norm(p[0]) > 2:
+        print("[SAFETY] Escaped X limmits.")
+        return 0
+    elif np.linalg.norm(p[1]) > 0.9:
+        print("[SAFETY] Escaped Y limmits.")
+        return 0
+    elif p[2] > 2:
+        print("[SAFETY] Escaped Z limmits.")
+        return 0
+    # Checks if anybody stopped working
+    global DEBUG_VEL
+    print(v, v[v < 1e-4])
+    if all(np.linalg.norm(v[i]) < 1e-4 for i in range(len(v))):
+        if DEBUG_VEL[id] > 10:
+            print("DEBUG_VEL")
+            return 0
+        else:
+            DEBUG_VEL[id] += 1
+    else:
+        DEBUG_VEL[id] = 0
+    
     try:
         reference = computeReference(p, vector_field, H, time-init_time, SAMPLING_TIME)
     except Exception as error:
@@ -131,27 +155,6 @@ def follow_field(id, state, agents, time, vector_field):
         return 0
 
     cmd = v + u*SAMPLING_TIME
-
-    if np.linalg.norm(p[0]) > 2:
-        print("[SAFETY] Escaped X limmits.")
-        return 0
-    elif np.linalg.norm(p[1]) > 0.9:
-        print("[SAFETY] Escaped Y limmits.")
-        return 0
-    elif p[2] > 2:
-        print("[SAFETY] Escaped Z limmits.")
-        return 0
-    
-    global DEBUG_VEL
-    print(v, v[v < 1e-4])
-    if all(np.linalg.norm(v[i]) < 1e-4 for i in range(len(v))):
-        if DEBUG_VEL[id] > 30:
-            print("DEBUG_VEL")
-            return 0
-        else:
-            DEBUG_VEL[id] += 1
-    else:
-        DEBUG_VEL[id] = 0
 
     if np.linalg.norm(cmd) < .05:
         print(cmd, time)
@@ -252,20 +255,12 @@ if __name__ == "__main__":
         LAST_STEP_TIME = post_sleep - loop_start
 
         if not all(status[ID_LIST]):
-            print("Exiting...")
-            break
+            print("Emergency Stoppage.")
+            swarm.allcfs.emergency()
+            quit()
 
     df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
     df.to_csv("experiment.csv", index=False)
-
-    kp = 0.1
-    landing_sites = [[state[id][0], state[id][1], 0.4] for id in range(ID_LIST_SIZE)]
-    print("Stabilizing before landing...")
-    while any(cfs[id].position()[2] > .45 for id in ID_LIST):
-        for id in ID_LIST:
-            """DEBUG CMD"""
-            cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - cfs[id].position()), yawRate=0)
-        timeHelper.sleep(SAMPLING_TIME)
 
     # %% Landing
     """
@@ -278,11 +273,22 @@ if __name__ == "__main__":
     
     """
     print("Landing...")
+
+    kp = 0.1
+    landing_sites = [[state[id][0], state[id][1], 0.3] for id in range(ID_LIST_SIZE)]
+    land_flag = [False]*ID_LIST_SIZE
     while any(state[id][2] > 0.1 for id in ID_LIST):
-        """DEBUG CMD"""
-        swarm.allcfs.land(targetHeight=0.04, duration=2.5)
-        timeHelper.sleep(TAKEOFF_DURATION)
+        for id in ID_LIST:
+            if state[id][2] > 0.4:
+                """DEBUG CMD"""
+                cfs[id].cmdVelocityWorld(kp*(landing_sites[id] - state[id][:3]), yawRate=0)
+            elif state[id][2] > 0.1 and not land_flag[id]:
+                """DEBUG CMD"""
+                cfs[id].land(targetHeight=0.04, duration=2.5)
+                land_flag[id] = True
+                print("Agent " + str(id) + " Landed.")
+        timeHelper.sleep(SAMPLING_TIME)
         state = np.zeros((ID_LIST_SIZE, 6))
         for id in ID_LIST:
             state[id][:3] = cfs[id].position()
-    print("Landed.")
+    print("All Landed.")
