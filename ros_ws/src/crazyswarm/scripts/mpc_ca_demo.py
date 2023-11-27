@@ -77,6 +77,8 @@ from pycrazyswarm import Crazyswarm
 DEBUG_VEL = np.zeros(ID_LIST_SIZE)
 
 def compute_state(last_state, LAST_STEP_TIME):
+    global data
+
     current_state = np.zeros((ID_LIST_SIZE, 6))
     current_time = timeHelper.time()
 
@@ -95,6 +97,7 @@ def compute_state(last_state, LAST_STEP_TIME):
     return current_state, current_time
 
 def follow_field(id, state, agents, time, vector_field):
+    global cmd_data
 
     p = state[id][:3]
     v = state[id][3:]
@@ -112,7 +115,6 @@ def follow_field(id, state, agents, time, vector_field):
         return 0
     # Checks if anybody stopped working
     global DEBUG_VEL
-    print(v, v[v < 1e-4])
     if all(np.linalg.norm(v[i]) < 1e-4 for i in range(len(v))):
         if DEBUG_VEL[id] > 10:
             print("DEBUG_VEL")
@@ -161,6 +163,8 @@ def follow_field(id, state, agents, time, vector_field):
 
     """DEBUG CMD"""
     cfs[id].cmdVelocityWorld(cmd, yawRate=0)
+
+    cmd_data.append([v[0], v[1], v[2], u[0], u[1], u[2], current_time-init_time, id])
         
     return 1
 
@@ -202,6 +206,7 @@ if __name__ == "__main__":
 
     # %% Declaring DataFrame
     data = []
+    cmd_data = []
 
     # %% Takeoff
     """
@@ -257,10 +262,17 @@ if __name__ == "__main__":
         if not all(status[ID_LIST]):
             print("Emergency Stoppage.")
             swarm.allcfs.emergency()
+            df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
+            df.to_csv("experiment.csv", index=False)
+            cmd_df = pd.DataFrame(cmd_data, columns=['vx', 'vy', 'vz', 'ax', 'ay', 'az', 't', 'id'])
+            cmd_df.to_csv("experiment_u.csv", index=False)
             quit()
+
 
     df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
     df.to_csv("experiment.csv", index=False)
+    cmd_df = pd.DataFrame(cmd_data, columns=['vx', 'vy', 'vz', 'ax', 'ay', 'az', 't', 'id'])
+    cmd_df.to_csv("experiment_u.csv", index=False)
 
     # %% Landing
     """
