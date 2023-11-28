@@ -46,12 +46,13 @@ with open(json_path, "r", encoding="utf-8") as config_file:
     # Model Predictive Control Parameters
     H = mpc_config["H"]
     ALPHA = mpc_config["ALPHA"]
+    BETA = mpc_config["BETA"]
     Q = np.diag(np.ones(6))
     Q[2][2] = 2
     Q[5][5] = 2
     print(Q)
     R = np.diag(ALPHA*np.ones(3))
-    RDU = np.diag(ALPHA*np.ones(3))
+    RDU = np.diag(BETA*np.ones(3))
     A = np.array([  [1, 0, 0, SAMPLING_TIME, 0, 0], \
                     [0, 1, 0, 0, SAMPLING_TIME, 0], \
                     [0, 0, 1, 0, 0, SAMPLING_TIME], \
