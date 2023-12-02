@@ -112,12 +112,14 @@ class CollisionAvoidance:
         norm_dp = np.linalg.norm(dp)
         dot_dvdp = np.dot(dv, dp)
 
-        if -np.dot(dp/norm_dp, dv) > np.sqrt(2*da_max*(norm_dp-Ds)) and not prediction_step==0:
+        if -np.dot(dp/norm_dp, dv) > np.sqrt(2*da_max*(norm_dp-Ds)):
             print("\033[92m {}\033[00m" .format("Constraint broken in step " + str(prediction_step)))
-            return 0,0,False
-        if np.linalg.norm(dp) < self.RADIUS + self.RADIUS and not np.linalg.norm(dp) == 0 and not prediction_step == 0:
+            if not prediction_step==0:
+                return 0,0,False
+        if np.linalg.norm(dp) < self.RADIUS + self.RADIUS and not np.linalg.norm(dp) == 0:
             print("Collision in step " +str(prediction_step)+ " of the prediction horizon with distance: " + str(np.linalg.norm(dp) - (self.RADIUS + self.RADIUS)))
-            return 0,0,False
+            if not prediction_step==0:
+                return 0,0,False
 
         if dot_dvdp >= 0:
             return 0,0,False
