@@ -1,0 +1,31 @@
+{
+    "experiment":{
+        "SAMPLING_TIME": 0.1,
+        "LANDING_HEIGHT": 0.04,
+        "TAKEOFF_HEIGHT": 1.0,
+        "SIMULATION_TIME": 60,
+        "CUBE_SIDE": 4,
+        "COLLISION_AVOIDANCE_METHOD": "None"
+    },
+    "agent":{
+        "RADIUS": 0.05,
+        "ID_LIST": [1]
+    },
+    "vector_field":{
+        "VR": 0.1,
+        "KF": 10,
+        "arguments": ["s", "t"],
+        "curves":[
+            "None",
+            "np.array([-0.6*np.sin(s), 0.6*np.cos(s), cos(0.1*t)*cos(s)**2]).T",
+            "None",
+            "None",
+            "None",
+            "np.array([ 0.6*np.sin(s), 0.6*np.cos(s), cos(0.1*t)*cos(s)**2]).T"
+        ]
+    },
+    "mpc":{
+        "H": 10,
+        "ALPHA": 0.00001
+    }
+}
