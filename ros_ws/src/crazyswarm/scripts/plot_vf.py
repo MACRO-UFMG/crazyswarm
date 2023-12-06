@@ -5,7 +5,7 @@ from tqdm import tqdm
 import plotly.express as px
 
 # %% Load Simulation Parameters from JSON
-with open("config.json", "r", encoding="utf-8") as config_file:
+with open("mpc_ca_demo.json", "r", encoding="utf-8") as config_file:
     config = load(config_file)
 
     experiment_config = config["experiment"]
