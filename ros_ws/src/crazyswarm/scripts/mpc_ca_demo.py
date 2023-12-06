@@ -47,6 +47,7 @@ with open(json_path, "r", encoding="utf-8") as config_file:
     H = mpc_config["H"]
     ALPHA = mpc_config["ALPHA"]
     BETA = mpc_config["BETA"]
+    SLACK = mpc_config["SLACK"]
     Q = np.diag(np.ones(6))
     Q[2][2] = 2
     Q[5][5] = 2
@@ -105,10 +106,10 @@ def follow_field(id, state, agents, time, vector_field):
 
     # %% Safety Checkup
     # Checks if inside the safe zone
-    if np.linalg.norm(p[0]) > 2:
+    if np.linalg.norm(p[0]) > 2.2:
         print("[SAFETY] Escaped X limmits.")
         return 0
-    elif np.linalg.norm(p[1]) > 0.9:
+    elif np.linalg.norm(p[1]) > 1.2:
         print("[SAFETY] Escaped Y limmits.")
         return 0
     elif p[2] > 2:
@@ -159,8 +160,8 @@ def follow_field(id, state, agents, time, vector_field):
 
     cmd = v + u*SAMPLING_TIME
 
-    if np.linalg.norm(cmd) < .05:
-        print(cmd, time)
+    # if np.linalg.norm(cmd) < .05:
+    #     print(cmd, time)
 
     """DEBUG CMD"""
     cfs[id].cmdVelocityWorld(cmd, yawRate=0)
@@ -197,7 +198,7 @@ if __name__ == "__main__":
                                 vr=VR, Kf=KF)
     # %% Declaring Model Predictive Control
 
-    mpc = MPC(6, 3, Q, R, RDU, H, SAMPLING_TIME, COLLISION_AVOIDANCE_METHOD)
+    mpc = MPC(6, 3, Q, R, RDU, H, SAMPLING_TIME, COLLISION_AVOIDANCE_METHOD, SLACK)
     mpc.set_dynamics(A, B)
 
     # %% Declaring Collision Avoidance

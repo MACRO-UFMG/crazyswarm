@@ -7,6 +7,7 @@ import os
 import numpy as np
 from json import load
 import time
+import pandas as pd
 
 from VectorField import *
 from MPC import *
@@ -16,7 +17,7 @@ from utils import *
 # Keep track of the file path
 file_path = os.path.dirname(os.path.realpath(__file__))
 # Load experiment configs from /collision-avoidance/scripts
-json_path = os.path.join(file_path, "config.json")
+json_path = os.path.join(file_path, "mpc_ca_demo.json")
 
 # %% Load JSON
 with open(json_path, "r", encoding="utf-8") as config_file:
@@ -32,6 +33,8 @@ with open(json_path, "r", encoding="utf-8") as config_file:
     SAMPLING_TIME = config["experiment"]["SAMPLING_TIME"]
     LANDING_HEIGHT = config["experiment"]["LANDING_HEIGHT"]
     COLLISION_AVOIDANCE_METHOD = experiment_config["COLLISION_AVOIDANCE_METHOD"]
+
+    RADIUS = config["agent"]["RADIUS"]
 
     KF = config["vector_field"]["KF"]
     VR = config["vector_field"]["VR"]
@@ -66,9 +69,14 @@ from pycrazyswarm import Crazyswarm
 
 def follow_field():
     try:
+        current_time = timeHelper.time()
+        
         p = cf.position()
-        v = vector_field.compute(p, timeHelper.time())
+        v = vector_field.compute(p, current_time-init_time)
         cf.cmdVelocityWorld(v, yawRate=0)
+
+        data.append([p[0], p[1], p[2], current_time-init_time, 3, RADIUS])
+        cmd_data.append([v[0], v[1], v[2], current_time-init_time, 3])
         
         return 1
     except Exception as error:
@@ -79,6 +87,9 @@ if __name__ == "__main__":
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     cf = swarm.allcfs.crazyflies[0]
+
+    data = []
+    cmd_data = []
 
     # %% Vector Field
     # Set the curve associated by ID
@@ -103,6 +114,12 @@ if __name__ == "__main__":
         loop_end = timeHelper.time()
         spent_time = loop_end - loop_start
         timeHelper.sleep(SAMPLING_TIME - spent_time)
+
+
+    df = pd.DataFrame(data, columns=['x', 'y', 'z', 't', 'curve', 'mode'])
+    df.to_csv("experiment.csv", index=False)
+    cmd_df = pd.DataFrame(cmd_data, columns=['vx', 'vy', 'vz', 't', 'id'])
+    cmd_df.to_csv("experiment_u.csv", index=False)
 
     cf.land(targetHeight=0.04, duration=2.5)
     timeHelper.sleep(TAKEOFF_DURATION)
