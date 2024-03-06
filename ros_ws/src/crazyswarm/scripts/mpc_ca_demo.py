@@ -7,10 +7,10 @@ import numpy as np
 from json import load
 import pandas as pd
 
-from VectorField import *
-from MPC import *
-from CollisionAvoidance import *
-from utils import *
+from CAMPC.VectorField import *
+from CAMPC.MPC import *
+from CAMPC.CollisionAvoidance import *
+from CAMPC.utils import *
 
 # %% Setup Paths
 # Keep track of the file path
