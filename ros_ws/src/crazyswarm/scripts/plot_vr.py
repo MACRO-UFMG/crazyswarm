@@ -5,7 +5,7 @@ from tqdm import tqdm
 import plotly.express as px
 
 # %% Load Simulation Parameters from JSON
-with open("mpc_ca_success2.json", "r", encoding="utf-8") as config_file:
+with open("config2.json", "r", encoding="utf-8") as config_file:
     config = load(config_file)
 
     experiment_config = config["experiment"]
@@ -22,7 +22,7 @@ with open("mpc_ca_success2.json", "r", encoding="utf-8") as config_file:
     arguments = vector_field_config['arguments']
     curves = vector_field_config["curves"]
 
-df = pd.read_csv('experiment_orca_success2.csv')
+df = pd.read_csv('experiment.csv')
 df_vel = pd.DataFrame()
 
 agents = df['curve'].unique()
