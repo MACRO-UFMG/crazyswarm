@@ -8,7 +8,7 @@
     },
     "agent":{
         "RADIUS": 0.15,
-        "ID_LIST": [1, 3]
+        "ID_LIST": [1, 3, 5]
     },
     "vector_field":{
         "VR": 0.1,

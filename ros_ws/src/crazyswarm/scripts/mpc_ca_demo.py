@@ -98,7 +98,7 @@ def compute_state(last_state, LAST_STEP_TIME):
 
     return current_state, current_time
 
-def follow_field(id, state, agents, time, vector_field):
+def follow_field(id, id_list, state, agents, time, vector_field):
     global cmd_data
 
     p = state[id][:3]
@@ -136,13 +136,13 @@ def follow_field(id, state, agents, time, vector_field):
     state = np.concatenate((p, v))
 
     if COLLISION_AVOIDANCE_METHOD == 'cbf':
-        A_cbf, b_cbf = collision_avoidance.compute_group_barrier_function(agents[id], agents)
+        A_cbf, b_cbf = collision_avoidance.compute_group_barrier_function(agents[id], [agents[i] for i in id_list])
         parameters = {
             "A" : A_cbf,
             "b" : b_cbf
         }
     elif COLLISION_AVOIDANCE_METHOD == 'orca':
-        orca_u, orca_n, propagated_states = collision_avoidance.compute_group_orca(agents[id], agents, tau=5, dt=SAMPLING_TIME)
+        orca_u, orca_n, propagated_states = collision_avoidance.compute_group_orca(agents[id], [agents[i] for i in id_list], tau=5, dt=SAMPLING_TIME)
         parameters = {
             "orca_u" : orca_u,
             "orca_n" : orca_n,
@@ -253,7 +253,7 @@ if __name__ == "__main__":
 
         state, current_time = compute_state(state, LAST_STEP_TIME)
         for id in ID_LIST:
-            status[id] = follow_field(id, state, agents, current_time, vector_fields[id])
+            status[id] = follow_field(id, ID_LIST, state, agents, current_time, vector_fields[id])
         
         loop_end = timeHelper.time()
         spent_time = loop_end - loop_start
