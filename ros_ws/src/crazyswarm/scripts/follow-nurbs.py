@@ -12,7 +12,7 @@ from online_path_planning_denurbs.scripts.robot_models import *
 from online_path_planning_denurbs.scripts.view_experiment import *
 
 
-INPUT_YAML_FILE_NAME = "config/config.yaml"
+INPUT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config.yaml"
 yaml_utils = YAML_utils(filename=INPUT_YAML_FILE_NAME)
 
 TAKEOFF_DURATION    = 2
@@ -50,38 +50,6 @@ if __name__ == "__main__":
 
     data = []
 
-    # %% Vector Field
-    # Set Target Curve
-
-    # %% Build the Vector Field
-    ########################
-    """ Setting for the curve """
-    ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
-    knot = yaml_utils.read_yaml()["knotvector"]
-    # print(f'w = {weights}')
-    evalpts_x, evalpts_y, curve = pathNURBS.nurbs(degree=DEGREE, points=ctrl_points, weigths=weights, dt=1/NUM_SAMPLES, knot=knot)
-
-    """ Update robot using the vector field control """
-    curve.delta = 1/15000
-    eval_func = curve.evaluate_single
-    field, s_star = compute_field(eval_func, pos=robot1.pos[:-1], s_i = s_i, s_f = s_f, Kf=KF_FIELD, vr=vrobot)
-    curve.delta = 1/NUM_SAMPLES
-    """ send control (vel) to the robot """
-    robot1.step(vx=field[0], vy=field[1], vz=0)
-
-    if s_star - s_delta <= 0:
-        s_i = 0
-        s_f = 1
-        # print('aqui 0')
-    elif s_star + s_delta >= 1:
-        s_i = 0
-        s_f = 1
-        # print('aqui 1')
-    else:
-        s_i = s_star - s_delta
-        s_f = s_star + s_delta
-    ########################
-
     # TAKEOFF
     cf.takeoff(targetHeight=1.0, duration=TAKEOFF_DURATION)
     timeHelper.sleep(TAKEOFF_DURATION)
@@ -93,11 +61,35 @@ if __name__ == "__main__":
 
         # Compute Reference
         ###################
+        """ Setting for the curve """
+        ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+        knot = yaml_utils.read_yaml()["knotvector"]
+        # print(f'w = {weights}')
+        evalpts_x, evalpts_y, curve = pathNURBS.nurbs(degree=DEGREE, points=ctrl_points, weigths=weights, dt=1/NUM_SAMPLES, knot=knot)
 
+        """ Update robot using the vector field control """
+        curve.delta = 1/15000
+        eval_func = curve.evaluate_single
+        field, s_star = compute_field(eval_func, pos=cf.position()[0:2], s_i = s_i, s_f = s_f, Kf=KF_FIELD, vr=vrobot)
+        curve.delta = 1/NUM_SAMPLES
+
+        if s_star - s_delta <= 0:
+            s_i = 0
+            s_f = 1
+            # print('aqui 0')
+        elif s_star + s_delta >= 1:
+            s_i = 0
+            s_f = 1
+            # print('aqui 1')
+        else:
+            s_i = s_star - s_delta
+            s_f = s_star + s_delta
         ###################
         # Apply Command
         ###################
-
+        """ send control (vel) to the robot """
+        v = np.array([field[0], field[1], 0])
+        cf.cmdVelocityWorld(v, yawRate=0)
         ###################
         
         loop_end = timeHelper.time()
