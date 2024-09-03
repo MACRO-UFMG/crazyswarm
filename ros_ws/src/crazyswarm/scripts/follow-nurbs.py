@@ -18,6 +18,13 @@ yaml_utils = YAML_utils(filename=INPUT_YAML_FILE_NAME)
 TAKEOFF_DURATION    = 2
 SIMULATION_TIME     = 60
 SAMPLING_TIME       = 0.1
+DEGREE              = 7
+NUM_SAMPLES         = 300
+KF_FIELD            = 2.0
+
+s_delta = 0.05
+s_f = 0.3
+s_i = 0.0
 
 """ robot parameters"""
 vrobot = 0.4
@@ -25,7 +32,7 @@ vobs = 0.3
 deltaVel = 0.1
 
 vr = vrobot + deltaVel
-r_control = 1/Kf_field*np.tan(np.pi/2*deltaVel/vr)
+r_control = 1/KF_FIELD*np.tan(np.pi/2*deltaVel/vr)
 
 
 r = 0.0
@@ -49,41 +56,30 @@ if __name__ == "__main__":
     # %% Build the Vector Field
     ########################
     """ Setting for the curve """
-    kappa_max = 1/pmin
-    gammai = 45*np.pi/180
-    gammaf = 45*np.pi/180
-
-    """ waypoint """
-    thi = thf = 0
-    pti = [robot1.x[0], robot1.y[0], 0]
-    ptf = [1.50, 1.5, 0] # goal position
-    goal_point = np.array(ptf[:2])
-    vi = vf = 0.1
-    initial_ctrlpoints, _, _, _= pathNURBS.generate_line_points(pti=pti, ptf=ptf, gammai=gammai, gammaf=gammaf, thi=0, thf=0, num_points=4, vi=vi, vf=vf, dimension=2)
-
-    wind = [0, 0]
-    ctrl_points = initial_ctrlpoints.copy()
-    weights = np.ones(len(ctrl_points))
-
-    _, _, curve = pathNURBS.nurbs(degree=degree, points=ctrl_points, weigths=weights, dt=1/num_samples)
-    initial_curve = curve
-    knot = curve.knotvector
-    yaml_utils.write_parameters_onFile(ctrl_points=initial_ctrlpoints.tolist(), weights= weights.tolist(), knotvector=np.array(curve.knotvector).tolist(), num_samples=num_samples, dimension=(len(ctrl_points)-6)*3+2+n_other_opm_var, wind=wind, vuav=vrobot, kappa_max=kappa_max, r_robot=r, vcurve=vrobot)
-
-    scale = 2        
-    li = [[-1.0*scale]*((len(weights)-nctrl_notchange*2)*2),[-1.00001]*(len(weights)-nctrl_notchange*2),-1,-1, -deltaVel]
-    li = flatten_list(li)
-    ui = [[1.0*scale]*((len(weights)-nctrl_notchange*2)*2),[1.0]*(len(weights)-nctrl_notchange*2), 0.00,0.00, deltaVel]
-    ui = flatten_list(ui)
-    yaml_utils.write_parameters_onFile(li=li, ui=ui)
+    ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+    knot = yaml_utils.read_yaml()["knotvector"]
+    # print(f'w = {weights}')
+    evalpts_x, evalpts_y, curve = pathNURBS.nurbs(degree=DEGREE, points=ctrl_points, weigths=weights, dt=1/NUM_SAMPLES, knot=knot)
 
     """ Update robot using the vector field control """
     curve.delta = 1/15000
     eval_func = curve.evaluate_single
-    field, s_star = compute_field(eval_func, pos=robot1.pos[:-1], s_i = s_i, s_f = s_f, Kf=Kf_field, vr=vrobot)
-    curve.delta = 1/num_samples
+    field, s_star = compute_field(eval_func, pos=robot1.pos[:-1], s_i = s_i, s_f = s_f, Kf=KF_FIELD, vr=vrobot)
+    curve.delta = 1/NUM_SAMPLES
     """ send control (vel) to the robot """
     robot1.step(vx=field[0], vy=field[1], vz=0)
+
+    if s_star - s_delta <= 0:
+        s_i = 0
+        s_f = 1
+        # print('aqui 0')
+    elif s_star + s_delta >= 1:
+        s_i = 0
+        s_f = 1
+        # print('aqui 1')
+    else:
+        s_i = s_star - s_delta
+        s_f = s_star + s_delta
     ########################
 
     # TAKEOFF
