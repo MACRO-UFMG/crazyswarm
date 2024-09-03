@@ -27,7 +27,7 @@ s_f = 0.3
 s_i = 0.0
 
 """ robot parameters"""
-vrobot = 0.4
+vrobot = 0.2
 vobs = 0.3
 deltaVel = 0.1
 
