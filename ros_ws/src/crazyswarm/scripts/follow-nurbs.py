@@ -21,6 +21,8 @@ SAMPLING_TIME       = 0.1
 DEGREE              = 7
 NUM_SAMPLES         = 300
 KF_FIELD            = 2.0
+TARGET_POSITION = [1.5, 1.0, 0.0]
+yaml_utils.write_parameters_onFile(target_position=TARGET_POSITION)
 
 ALTITUDE = 1.
 
@@ -30,7 +32,7 @@ s_i = 0.0
 
 """ robot parameters"""
 vrobot = 0.2
-vobs = 0.3
+
 deltaVel = 0.1
 
 vr = vrobot + deltaVel
@@ -45,6 +47,13 @@ Rsafe = 0.2 + r_control
 Rview = 1.2
 
 
+pobs0 = np.array([0.0, 0.2, 0.0, 0.5])
+vobs0 = np.array([0.0, 0.0, 0.0])
+
+pobs1 = np.array([-1.5, 1, 0.0, 0.2])
+vdir1 = np.array([1.5, 1., 0.0]) - pobs1[:3]
+vobs1 = 0.1*vdir1/np.linalg.norm(vdir1)
+
 if __name__ == "__main__":
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
@@ -57,7 +66,7 @@ if __name__ == "__main__":
     timeHelper.sleep(TAKEOFF_DURATION)
 
     previous_position = cf.position()
-    target_position = [1.5, 1.0]
+    
 
     init_time = timeHelper.time()
     
@@ -77,7 +86,14 @@ if __name__ == "__main__":
 
         current_position = cf.position()
 
-        if np.linalg.norm(current_position[0:2] - target_position) < 0.1:
+        """ Update position and vel to the planner """
+        yaml_utils.write_parameters_onFile(agent_pos=current_position, agent_vel=(current_position-previous_position)/SAMPLING_TIME)
+        list_pobs = np.array([pobs0, pobs1])
+        list_vobs = np.array([vobs0, vobs1])
+        yaml_utils.write_parameters_onFile(obs=list_pobs.tolist(), vobs=list_vobs.tolist())
+        pobs1[:2] = pobs1[:2] + vobs1*SAMPLING_TIME
+
+        if np.linalg.norm(current_position[:2] - TARGET_POSITION[:2]) < 0.1:
             break
         elif current_position[0] > 1.5 or current_position[1] > 1:
             break
