@@ -14,6 +14,7 @@ from online_path_planning_denurbs.scripts.view_experiment import *
 
 INPUT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_1static_obs.yaml"
 yaml_utils = YAML_utils(filename=INPUT_YAML_FILE_NAME)
+yaml_utils.write_parameters_onFile(start=0)
 
 TAKEOFF_DURATION    = 2
 SIMULATION_TIME     = 60
@@ -50,8 +51,8 @@ Rview = 1.2
 pobs0 = np.array([0.0, 0.2, 0.0, 0.5])
 vobs0 = np.array([0.0, 0.0, 0.0])
 
-pobs1 = np.array([-1.5, 1, 0.0, 0.2])
-vdir1 = np.array([1.5, 1., 0.0]) - pobs1[:3]
+pobs1 = np.array([1.3, 0.7, 0.0, 0.2])
+vdir1 = np.array([-0.5, -0.4, 0.0]) - pobs1[:3]
 vobs1 = 0.1*vdir1/np.linalg.norm(vdir1)
 
 if __name__ == "__main__":
@@ -65,19 +66,25 @@ if __name__ == "__main__":
     cf.takeoff(targetHeight=ALTITUDE, duration=TAKEOFF_DURATION)
     timeHelper.sleep(TAKEOFF_DURATION)
 
+    
     previous_position = cf.position()
     
+    yaml_utils.write_parameters_onFile(start=1)
 
     init_time = timeHelper.time()
     
+    # try:
     while timeHelper.time() - init_time < SIMULATION_TIME:
         loop_start = timeHelper.time()
 
         # Compute Reference
         ###################
         """ Setting for the curve """
-        ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+        # ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+        ctrl_points = np.array(yaml_utils.read_yaml()["control_points"], dtype=float)
+        weights = np.array(yaml_utils.read_yaml()["weights"], dtype=float)
         knot = yaml_utils.read_yaml()["knotvector"]
+        print(weights)
         evalpts_x, evalpts_y, curve = pathNURBS.nurbs(degree=DEGREE, points=ctrl_points, weigths=weights, dt=1/NUM_SAMPLES, knot=knot)
 
         """ Update robot using the vector field control """
@@ -87,13 +94,13 @@ if __name__ == "__main__":
         current_position = cf.position()
 
         """ Update position and vel to the planner """
-        yaml_utils.write_parameters_onFile(agent_pos=current_position, agent_vel=(current_position-previous_position)/SAMPLING_TIME)
+        yaml_utils.write_parameters_onFile(agent_pos=current_position.tolist(), agent_vel=((current_position-previous_position)/SAMPLING_TIME).tolist())
         list_pobs = np.array([pobs0, pobs1])
         list_vobs = np.array([vobs0, vobs1])
         yaml_utils.write_parameters_onFile(obs=list_pobs.tolist(), vobs=list_vobs.tolist())
-        pobs1[:2] = pobs1[:2] + vobs1*SAMPLING_TIME
+        pobs1[:3] = pobs1[:3] + vobs1*SAMPLING_TIME
 
-        if np.linalg.norm(current_position[:2] - TARGET_POSITION[:2]) < 0.1:
+        if np.linalg.norm(current_position[:2] - TARGET_POSITION[:2]) < 0.05:
             break
         elif current_position[0] > 1.5 or current_position[1] > 1:
             break
@@ -132,14 +139,19 @@ if __name__ == "__main__":
         ###################
 
         data.append([current_position[0], current_position[1],
-                     (current_position[0] - previous_position[0])/SAMPLING_TIME, (current_position[1] - previous_position[1])/SAMPLING_TIME,
-                     v[0], v[1],
-                     loop_end - init_time, 1
+                    (current_position[0] - previous_position[0])/SAMPLING_TIME, (current_position[1] - previous_position[1])/SAMPLING_TIME,
+                    v[0], v[1],
+                    loop_end - init_time, 1
         ])
         previous_position = current_position
 
         ###################
 
+    # except Exception as e:
+    #     print(e)
+    #     df = pd.DataFrame(data, columns=['x', 'y', 'vx', 'vy', 'ux', 'uy', 't', 'id'])
+    #     df.to_csv("experiment.csv", index=False)
+    #     cf.cmdVelocityWorld([0., 0., 0.], yawRate=0)
 
     df = pd.DataFrame(data, columns=['x', 'y', 'vx', 'vy', 'ux', 'uy', 't', 'id'])
     df.to_csv("experiment.csv", index=False)

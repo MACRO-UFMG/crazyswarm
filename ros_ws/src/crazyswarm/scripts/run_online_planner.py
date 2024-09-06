@@ -4,13 +4,9 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 import time
-import re
 import subprocess
-import imageio
-import csv
 import pickle
 from datetime import datetime
 
@@ -24,7 +20,7 @@ from online_path_planning_denurbs.scripts.robot_models import *
 from online_path_planning_denurbs.scripts.view_experiment import *
 
 
-INPUT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_1static_obs_copy.yaml"
+INPUT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_1static_obs.yaml"
 yaml_utils = YAML_utils(filename=INPUT_YAML_FILE_NAME)
 
 
@@ -40,7 +36,9 @@ def runplanner(VO=True, verbose=False):
     else:
         subprocess.run([running, "1", INPUT_YAML_FILE_NAME], stdout=subprocess.PIPE, stderr=subprocess.PIPE) # 
    
-    new_ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+    # new_ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+    new_ctrl_points = np.array(yaml_utils.read_yaml()["control_points"], dtype=float)
+    weights = np.array(yaml_utils.read_yaml()["weights"], dtype=float)
 
     return new_ctrl_points, weights
 
@@ -55,7 +53,7 @@ PLANNING_TIME = 0.4
 SAVE_EXPERIMENT = True
 PATH_RESULTS = "./online_path_planning_denurbs/results/"
 NAGENTS = 0
-TARGET_POSITION = np.array(yaml_utils.read_yaml()["target_position"])[0][:2]
+TARGET_POSITION = np.array(yaml_utils.read_yaml()["target_position"])[:2]
 print(TARGET_POSITION)
 DEBUG = False
 VO_flag = True
@@ -123,6 +121,10 @@ curve_list = []
 agent_pos = yaml_utils.read_yaml()["agent_pos"]
 agent_vel = yaml_utils.read_yaml()["agent_vel"]
 
+while(not yaml_utils.read_yaml()["start"]):
+    pass
+
+print('starting planner!!!!')
 
 while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):   
     
@@ -222,14 +224,17 @@ while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):
         _cost_constraint = yaml_utils.read_yaml()["_cost_constraint"]
         if _cost_constraint > 0:
             print(f'failed, g = {_cost_constraint:.3f}')
-            for iid, obs  in enumerate(list_detected_obstacles):
-                    # pos_obs.append([obs.x[-1] + PLANNING_TIME*obs.vx,obs.y[-1]+PLANNING_TIME*obs.vy,obs.r])
-                    print(f'obs{iid}, dist = {np.linalg.norm(np.array([obs.x[-1], obs.y[-1]]) - agent_pos[:2]):.4f}')
+            # for iid, obs  in enumerate(list_detected_obstacles):
+            #         # pos_obs.append([obs.x[-1] + PLANNING_TIME*obs.vx,obs.y[-1]+PLANNING_TIME*obs.vy,obs.r])
+            #         print(f'obs{iid}, dist = {np.linalg.norm(np.array([obs.x[-1], obs.y[-1]]) - agent_pos[:2]):.4f}')
             new_ctrl_points, new_weights = runplanner(VO=VO_flag, verbose=DEBUG)
             new_vrobot = yaml_utils.read_yaml()["vcurve"]
         else:
             break
     
+    tt2 = (time.time() - tt)
+    if tt2 < PLANNING_TIME:
+        time.sleep(PLANNING_TIME - tt2)
     
 
     t_run.append(time.time() - tt)  
