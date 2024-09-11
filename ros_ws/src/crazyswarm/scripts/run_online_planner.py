@@ -20,8 +20,13 @@ from online_path_planning_denurbs.scripts.robot_models import *
 from online_path_planning_denurbs.scripts.view_experiment import *
 
 
-INPUT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_1static_obs.yaml"
-yaml_utils = YAML_utils(filename=INPUT_YAML_FILE_NAME)
+AGENT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_agent.yaml"
+PLANNER_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_planner.yaml"
+OPT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_opt.yaml"
+
+yaml_agent = YAML_utils(filename=AGENT_YAML_FILE_NAME)
+yaml_opt = YAML_utils(filename=OPT_YAML_FILE_NAME)
+yaml_planner = YAML_utils(filename=PLANNER_YAML_FILE_NAME)
 
 
 
@@ -32,15 +37,15 @@ def runplanner(VO=True, verbose=False):
     else:
         running = "./online_path_planning_denurbs/source/main"
     if verbose:
-        subprocess.run([running, "1", INPUT_YAML_FILE_NAME])
+        subprocess.run([running, "1", OPT_YAML_FILE_NAME, AGENT_YAML_FILE_NAME])
     else:
-        subprocess.run([running, "1", INPUT_YAML_FILE_NAME], stdout=subprocess.PIPE, stderr=subprocess.PIPE) # 
+        subprocess.run([running, "1", OPT_YAML_FILE_NAME, AGENT_YAML_FILE_NAME], stdout=subprocess.PIPE, stderr=subprocess.PIPE) # 
    
-    # new_ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
-    new_ctrl_points = np.array(yaml_utils.read_yaml()["control_points"], dtype=float)
-    weights = np.array(yaml_utils.read_yaml()["weights"], dtype=float)
+    # # new_ctrl_points, weights = yaml_utils.getControlWeightsfromConfig(yaml_utils.read_yaml())
+    # new_ctrl_points = np.array(yaml_agent.read_yaml()["control_points"], dtype=float)
+    # weights = np.array(yaml_agent.read_yaml()["weights"], dtype=float)
 
-    return new_ctrl_points, weights
+    # return new_ctrl_points, weights
 
 
 
@@ -49,51 +54,59 @@ def runplanner(VO=True, verbose=False):
 
 
 """experiment parameters """
-PLANNING_TIME = 0.4
+PLANNING_TIME = 0.4 
 SAVE_EXPERIMENT = True
 PATH_RESULTS = "./online_path_planning_denurbs/results/"
 NAGENTS = 0
-TARGET_POSITION = np.array(yaml_utils.read_yaml()["target_position"])[:2]
+TARGET_POSITION = np.array(yaml_planner.read_yaml()["target_position"], dtype=float)[:2]
 print(TARGET_POSITION)
 DEBUG = False
 VO_flag = True
 
 """ robot parameters"""
-vrobot = 0.2
+vrobot = 0.3
 deltaVel = 0.1
 
 
 """ optimization parameters """
 tVO = 1.2*PLANNING_TIME
 degree = 7
-NUM_SAMPLES = 400
+NUM_SAMPLES = 440
 n_other_opm_var = 1
 nctrl_notchange = 3
 scale = 2
 
 # li = [-1.*scale,-1.*scale,-1.*scale,-1.*scale,-1.*scale,-1.*scale,-1.*scale,-1.*scale,-1.00001,-1.00001,-1.00001,-1.00001,-1,-1, -deltaVel]
 # ui = [1.*scale,1.*scale,1.*scale,1.*scale,1.*scale,1.*scale,1.*scale,1.*scale,1.0,1.0,1.0,1.0,0.00,0.00, deltaVel]
-yaml_utils.write_parameters_onFile(tVO=tVO, aval=18000, npi=int(18*15), tsampling=PLANNING_TIME, degree=degree)
+yaml_opt.write_parameters_onFile(tVO=tVO, aval=18000, npi=int(18*15), tsampling=PLANNING_TIME, degree=degree)
 
 """ Running simulation """
 """ List of detected obstacles """
-list_detected_obstacles = yaml_utils.read_yaml()["obs"]
-list_detected_vobs = yaml_utils.read_yaml()["vobs"]
+list_detected_obstacles = yaml_planner.read_yaml()["obs"]
+list_detected_vobs = yaml_planner.read_yaml()["vobs"]
 obstacles = []
 vel_obs = []
+# FIX THAT
+fix = 0
 for obs, vobs in zip(list_detected_obstacles, list_detected_vobs):
     """ projection of the obstacles"""
-    obstacles.append([obs[0]+vobs[0]*PLANNING_TIME,obs[1]+vobs[1]*PLANNING_TIME, obs[2]+vobs[2]*PLANNING_TIME, obs[3]])
-    vel_obs.append([vobs[0], vobs[1], vobs[1]])
+    if fix:
+        obstacles.append([obs[0]+vobs[0]*(PLANNING_TIME+0.0),obs[1]+vobs[1]*(PLANNING_TIME+0.0), obs[2]+vobs[2]*(PLANNING_TIME+0.0), obs[3]])
+        vel_obs.append([vobs[0], vobs[1], vobs[1]])
+    else:
+        obstacles.append([obs[0],obs[1], obs[2], obs[3]])
+        vel_obs.append([vobs[0], vobs[1], vobs[1]])
+        fix =1 
 obstacles = np.array(obstacles)
 vel_obs = np.array(vel_obs)
 
 
 """ initial path """
-new_ctrl_points = yaml_utils.read_yaml()["control_points"]
-new_weights = yaml_utils.read_yaml()["weights"]
-new_vrobot = yaml_utils.read_yaml()["vcurve"]
-new_knotvector = yaml_utils.read_yaml()["knotvector"]
+new_ctrl_points = np.array(yaml_agent.read_yaml()["control_points"], dtype=float)
+new_weights = np.array(yaml_agent.read_yaml()["weights"], dtype=float)
+# new_vrobot = np.array(yaml_agent.read_yaml()["vcurve"], dtype=float)
+new_vrobot = np.linalg.norm(np.array(yaml_planner.read_yaml()["agent_vel"])[:2])
+new_knotvector = np.array(yaml_agent.read_yaml()["knotvector"], dtype=float)
 ctrl_points = new_ctrl_points.copy()
 weights = new_weights.copy()
 knot = new_knotvector.copy()
@@ -106,7 +119,7 @@ li = [[-1.0*scale]*((len(weights)-nctrl_notchange*2)*2),[-1.00001]*(len(weights)
 li = flatten_list(li)
 ui = [[1.0*scale]*((len(weights)-nctrl_notchange*2)*2),[1.0]*(len(weights)-nctrl_notchange*2), 0.00,0.00, deltaVel]
 ui = flatten_list(ui)
-yaml_utils.write_parameters_onFile(li=li, ui=ui)
+yaml_opt.write_parameters_onFile(li=li, ui=ui)
 
 
 """ Main loop """
@@ -118,16 +131,17 @@ weights_list = []
 knot_list = []
 curve_list = []
 
-agent_pos = yaml_utils.read_yaml()["agent_pos"]
-agent_vel = yaml_utils.read_yaml()["agent_vel"]
+agent_pos = yaml_planner.read_yaml()["agent_pos"]
+agent_vel = yaml_planner.read_yaml()["agent_vel"]
 
-while(not yaml_utils.read_yaml()["start"]):
+while(not yaml_planner.read_yaml()["start"]):
     pass
 
 print('starting planner!!!!')
 
 while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):   
-    
+    if(yaml_planner.read_yaml()["start"] == 0):
+        break
     
         
     tt = time.time()
@@ -153,15 +167,18 @@ while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):
     """ cut the curve in the project future position"""    
     _, _, curve_to_cut = pathNURBS.nurbs(degree=degree, points=ctrl_points.copy(), weigths=weights.copy(), dt=1/NUM_SAMPLES, knot=knot.copy())
     dist_robot2goal = np.linalg.norm(agent_pos[:2] - TARGET_POSITION)
-    if dist_robot2goal <= 1.0:
-        Nsamples = 400
-    elif dist_robot2goal <= 0.5:
-        Nsamples = 200
-    else:
-        Nsamples = 1500
-    target_point_to_planner = project_future_position_on_curve(curve_to_cut, 0 , PLANNING_TIME, 0, vrobot, None, follow_field=False, N=Nsamples)
+    # if dist_robot2goal <= 1.0:
+    #     Nsamples = 800
+    # elif dist_robot2goal <= 0.5:
+    #     Nsamples = 400
+    # else:
+    #     Nsamples = 1500
+    Nsamples = NUM_SAMPLES
+    ustart = pathNURBS.find_closest_parameter_2d(curve_to_cut, np.array(agent_pos[:2]), max_iter=int(1/curve_to_cut.delta))   
+    print(f'usart = {ustart}')
+    target_point_to_planner = project_future_position_on_curve(curve_to_cut, 0 , PLANNING_TIME+0.0, 0, vrobot, None, follow_field=False, N=Nsamples,ustart=ustart)
     previous_target_point = target_point_to_planner
-    
+    print(f'projected_point = {target_point_to_planner}, tp = {PLANNING_TIME}, vrob = {vrobot}')
     
     projected_ctrl_points, projected_weights, new_knotvector_after_split = pathNURBS.split_closest_point_2d(curve_to_cut,target_point_to_planner, take_before=0.0) 
     
@@ -179,17 +196,27 @@ while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):
     # target_point_to_planner = ctrl_points[0]
 
     """ Update the list of detected obstacles """
-    list_detected_obstacles = yaml_utils.read_yaml()["obs"]
-    list_detected_vobs = yaml_utils.read_yaml()["vobs"]
+    list_detected_obstacles = yaml_planner.read_yaml()["obs"]
+    list_detected_vobs = yaml_planner.read_yaml()["vobs"]
+
+    print(f'number of detected obstacles = {len(list_detected_obstacles)}')
+    
     obstacles = []
     vel_obs = []
+    # FIX THAT
+    fix = 0
     for obs, vobs in zip(list_detected_obstacles, list_detected_vobs):
         """ projection of the obstacles"""
-        obstacles.append([obs[0]+vobs[0]*PLANNING_TIME,obs[1]+vobs[1]*PLANNING_TIME, obs[2]+vobs[2]*PLANNING_TIME, obs[3]])
-        vel_obs.append([vobs[0], vobs[1], vobs[1]])
+        if fix:
+            obstacles.append([obs[0]+vobs[0]*(PLANNING_TIME+0.0),obs[1]+vobs[1]*(PLANNING_TIME+0.0), obs[2]+vobs[2]*(PLANNING_TIME+0.0), obs[3]])
+            vel_obs.append([vobs[0], vobs[1], vobs[1]])
+        else:
+            obstacles.append([obs[0],obs[1], obs[2], obs[3]])
+            vel_obs.append([vobs[0], vobs[1], vobs[1]])
+            fix =1 
     obstacles = np.array(obstacles)
     vel_obs = np.array(vel_obs)
-    
+    # yaml_opt.write_parameters_onFile(obs=obstacles.tolist(), vobs=vel_obs.tolist())
 
     """ set new parameters to planner"""
     if np.linalg.norm(np.array([evalpts_x[0], evalpts_y[0]]) - TARGET_POSITION) < 1:
@@ -204,33 +231,45 @@ while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):
     li = flatten_list(li)
     ui = [[1.0*scale]*((len(projected_weights)-nctrl_notchange*2)*2),[1.0]*(len(projected_weights)-nctrl_notchange*2), 0.00,0.00, deltaVel]
     ui = flatten_list(ui)
-    yaml_utils.write_parameters_onFile(li=li, ui=ui)
+    # yaml_opt.write_parameters_onFile(li=li, ui=ui)
     
     
     """ run new planner, but update the curve only in the next interation        """  
-    yaml_utils.write_parameters_onFile(d = (len(projected_weights)-nctrl_notchange*2)*3+2+n_other_opm_var)      
-    yaml_utils.write_parameters_onFile(ctrl_points=projected_ctrl_points.tolist(), weights=projected_weights.tolist(), knotvector=new_knotvector_after_split.tolist())
-    new_ctrl_points, new_weights = runplanner(VO=VO_flag, verbose=DEBUG)
-    new_knotvector = new_knotvector_after_split.copy()
-    new_vrobot = yaml_utils.read_yaml()["vcurve"]
+    # yaml_opt.write_parameters_onFile(d = (len(projected_weights)-nctrl_notchange*2)*3+2+n_other_opm_var)      
+    yaml_opt.write_parameters_onFile(d = (len(projected_weights)-nctrl_notchange*2)*3+2+n_other_opm_var, \
+                                     ctrl_points=projected_ctrl_points.tolist(), weights=projected_weights.tolist(), knotvector=new_knotvector_after_split.tolist(),\
+                                    li=li, ui=ui, obs=obstacles.tolist(), vobs=vel_obs.tolist())
+    
+    runplanner(VO=VO_flag, verbose=DEBUG)
+    yaml_agent.write_parameters_onFile(projected_point=target_point_to_planner.tolist())
+    
+    
+    new_ctrl_points = np.array(yaml_agent.read_yaml()["control_points"], dtype=float)
+    new_weights = np.array(yaml_agent.read_yaml()["weights"], dtype=float)
+    new_knotvector = np.array(yaml_agent.read_yaml()["knotvector"], dtype=float)
+    # new_vrobot = yaml_agent.read_yaml()["vcurve"]
+    new_vrobot = np.linalg.norm(np.array(yaml_planner.read_yaml()["agent_vel"])[:2])
+    print(f'vrobot = {new_vrobot}')
     
     
 
     # nctrl_notchange = 3
     # yaml_utils.write_parameters_onFile(nctrl_notchange=nctrl_notchange)
     
-    for _ in range(10):
-        # new_ctrl_points, new_weights = runplanner(VO=VO_flag, verbose=DEBUG)
-        _cost_constraint = yaml_utils.read_yaml()["_cost_constraint"]
-        if _cost_constraint > 0:
-            print(f'failed, g = {_cost_constraint:.3f}')
-            # for iid, obs  in enumerate(list_detected_obstacles):
-            #         # pos_obs.append([obs.x[-1] + PLANNING_TIME*obs.vx,obs.y[-1]+PLANNING_TIME*obs.vy,obs.r])
-            #         print(f'obs{iid}, dist = {np.linalg.norm(np.array([obs.x[-1], obs.y[-1]]) - agent_pos[:2]):.4f}')
-            new_ctrl_points, new_weights = runplanner(VO=VO_flag, verbose=DEBUG)
-            new_vrobot = yaml_utils.read_yaml()["vcurve"]
-        else:
-            break
+    # for _ in range(10):
+    #     # new_ctrl_points, new_weights = runplanner(VO=VO_flag, verbose=DEBUG)
+    #     _cost_constraint = yaml_agent.read_yaml()["_cost_constraint"]
+    #     if _cost_constraint > 0:
+    #         print(f'failed, g = {_cost_constraint:.3f}')
+    #         # for iid, obs  in enumerate(list_detected_obstacles):
+    #         #         # pos_obs.append([obs.x[-1] + PLANNING_TIME*obs.vx,obs.y[-1]+PLANNING_TIME*obs.vy,obs.r])
+    #         #         print(f'obs{iid}, dist = {np.linalg.norm(np.array([obs.x[-1], obs.y[-1]]) - agent_pos[:2]):.4f}')
+    #         runplanner(VO=VO_flag, verbose=DEBUG)
+    #         new_ctrl_points = np.array(yaml_agent.read_yaml()["control_points"], dtype=float)
+    #         new_weights = np.array(yaml_agent.read_yaml()["weights"], dtype=float)
+    #         new_vrobot = yaml_agent.read_yaml()["vcurve"]
+    #     else:
+    #         break 
     
     tt2 = (time.time() - tt)
     if tt2 < PLANNING_TIME:
@@ -243,6 +282,9 @@ while (np.linalg.norm(agent_pos[:2] - TARGET_POSITION) >= .1):
     weights_list.append(weights)
     knot_list.append(knot)
     curve_list.append(curve)
+
+    agent_pos = yaml_planner.read_yaml()["agent_pos"]
+    # agent_vel = yaml_planner.read_yaml()["agent_vel"]
     
     
 
@@ -267,7 +309,7 @@ print("")
 print(rf'avg computational effort = {np.mean(np.array(t_run))} $\pm$ {np.std(np.array(t_run))}s')
 print( f'min computational effort = {np.min(np.array(t_run))}s')
 print( f'max computational effort = {np.max(np.array(t_run))}s')
-fig = plt.figure()
+fig = plt.figure(figsize=(10,10))
 plt.plot(t_run, '*-b')
 plt.show()
 
