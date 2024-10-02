@@ -26,7 +26,7 @@ AGENT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_agent.yaml"
 PLANNER_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_planner.yaml"
 OPT_YAML_FILE_NAME = "online_path_planning_denurbs/config/config_opt.yaml"
 
-NAME_EXPERIMENT = "5obs"
+NAME_EXPERIMENT = "1obs"
 
 yaml_agent = YAML_utils(filename=AGENT_YAML_FILE_NAME)
 yaml_opt = YAML_utils(filename=OPT_YAML_FILE_NAME)
@@ -111,12 +111,12 @@ def update_obstacles(list_static_obs, list_static_vobs, list_dynamic_obs,  list_
     return list_detected_obstacles, list_detected_vobs
 
 """ Static obstacles """
-N_static_obs = 1
+N_static_obs = 2
 vobs_static = np.array([0,0,0])
 pos_static = [
-    # [1.800, 0.080, 0.00, 0.30],
+    [.500, .00, 0.00, 0.30],
     # [0.00, 0.20, 0.00, 0.50],
-    [-1.3, 0.0, 0.0, 0.5+r_control],
+    [-1.3, 0.0, 0.0, 0.5+r_control+0.075],
     # [0.75, 0.75, 0.00, 0.50],
     
     
@@ -133,10 +133,12 @@ N_dynamic_obs = 0
 vobs_dynamic = [
     # np.array([-1,  0,  0])/np.linalg.norm(np.array([-1,  0,  0]))*vobs/4, 
     # np.array([ 0, -1,  0])/np.linalg.norm(np.array([ 0, -1,  0]))*vobs, 
-    # np.array([ 1, -1,  0])/np.linalg.norm(np.array([ 1, -1,  0]))*vobs,            
+    # np.array([ 1, -1,  0])/np.linalg.norm(np.array([ 1, -1,
+    #   0]))*vobs,            
     # np.array([ -1, -1,  0])/np.linalg.norm(np.array([ -1, -1,  0]))*vobs,    
                 
                 
+
                 
                 
                 ]
@@ -167,7 +169,7 @@ gammaf = 0*np.pi/180
 """ waypoint """
 thi = thf = 0
 pti = [robot1.x[0], robot1.y[0], 0]
-ptf = [1.5, 0.5, 0] # goal position
+ptf = [1.4, 0.5, 0] # goal position
 goal_point = np.array(ptf[:2])
 
 yaml_planner.write_parameters_onFile(target_position=ptf, agent_pos=pti)

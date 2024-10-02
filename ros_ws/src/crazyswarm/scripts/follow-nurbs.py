@@ -24,7 +24,7 @@ yaml_planner = YAML_utils(filename=PLANNER_YAML_FILE_NAME)
 
 yaml_planner.write_parameters_onFile(start=0)
 
-NAME_EXPERIMENT = "5obs"
+NAME_EXPERIMENT = "1obs"
 
 TAKEOFF_DURATION    = 2
 SIMULATION_TIME     = 35
@@ -58,7 +58,7 @@ Rsafe = 0.15 + r_control + 0.075
 Rview = 1.55
 print(f'Rsafe = {Rsafe}, rcontrol = {r_control}')
 
-pobs0 = np.array([-1.3, 0.0, 0.0, 0.5+r_control])
+pobs0 = np.array([-1.3, 0.0, 0.0, 0.5+r_control+0.075])
 vobs0 = np.array([0.0, 0.0, 0.0])
 
 pobs1 = np.array([1.1, -1.1, 0.0, Rsafe])
@@ -78,10 +78,10 @@ vdir4 = np.array([0, 1, 0.0]) - pobs4[:3]
 vobs4 = 0.1*vdir4/np.linalg.norm(vdir4)
 
 # pobs0[:2] *= 100
-# pobs1[:2] *= 100
-# pobs3[:2] *= 100
-# pobs4[:2] *= 100
-# pobs2[:2] *= 100
+pobs1[:2] *= 100
+pobs3[:2] *= 100
+pobs4[:2] *= 100
+pobs2[:2] *= 100
 
 if __name__ == "__main__":
     swarm = Crazyswarm()
