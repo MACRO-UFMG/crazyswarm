@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find crazyswarm)/launch/mocap_obstacles.launch"/>
+    <include file="$(find crazyswarm)/launch/hover_swarm.launch"/>
+    <node pkg="crazyswarm" type="mysim.py" name="mysim" output="screen"/>
+</launch>

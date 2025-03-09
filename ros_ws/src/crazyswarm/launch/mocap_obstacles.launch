@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find mocap_optitrack)/launch/mocap.launch">
+        <arg name="mocap_config_file" value="$(find crazyswarm)/launch/mocap.yaml"/>
+    </include>
+    <node pkg="crazyswarm" type="mocap_fix_tf.py" name="mocap_fix_tf" output="screen"/>
+    <node pkg="crazyswarm" type="foamball_pointcloud.py" name="foamball_pointcloud" output="screen"/>
+</launch>
