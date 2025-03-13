@@ -5,6 +5,9 @@ import os
 import sys
 import rospy
 
+import sensor_msgs.point_cloud2 as pc2
+from sensor_msgs.msg import PointCloud2
+
 # %% Setup Paths
 # Keep track of the file path
 file_path = os.path.dirname(os.path.realpath(__file__))
@@ -20,15 +23,31 @@ sys.path.append(cs_scripts_path)
 from pycrazyswarm import Crazyswarm
 
 
-TAKEOFF_HEIGHT = 0.6
-TAKEOFF_DURATION = 2.5
-HOVER_DURATION = 1.0
+def compute_gradient(f, x):
+    x = x.flatten()
+    epsilon = 1e-6
+    n = len(x)
+    grad = np.zeros(n)
+    for i in range(n):
+        dp = np.zeros(n)
+        dp[i] = epsilon
+        f_plus = f(x + dp)
+        f_minus = f(x - dp)
+        grad[i] = (f_plus - f_minus) / (2 * epsilon)
+    return grad
 
-swarm = Crazyswarm()
-timeHelper = swarm.timeHelper
-cf = swarm.allcfs.crazyflies[0]
 
-FLY_DRONE=False
+def smooth_distance(p, h, A):
+    m_samples = A.shape[1]
+    if not m_samples:
+        return np.inf   
+    D = 0
+    for i in range(m_samples):
+        a = A[:,i].T
+        D = D + (np.linalg.norm(p-a)**2/2)**(-1/h)
+    D = D**(-h)
+    return D
+
 
 class CurveVectorField:
   
@@ -82,24 +101,33 @@ class CurveVectorField:
 
 class ObstacleVectorField:
     
-    def __init__(self, lam=0.1, M = np.matrix([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), vr=.25, kG=10):
+    def __init__(self, lam=0.1, M = np.matrix([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), h = 0.1, vr=.25, kG=10):
         self.lam = lam # lambda parameter
+        self.M = M
+        self.h = h
         self.vr = vr
         self.kG = kG
-        self.M = M
+        self.__prev_t = None
+        self.__prev_o_star = None
+        self.O = np.matrix([])
 
-    def compute(self, p):
+    def compute(self, p, t):
         # Smooth distance
-        # Do = compute_gradient( @(x) smooth_distance(x,h,O), p)
-        Do = 100*np.array([1,0,0])
+        Do = compute_gradient(lambda x: smooth_distance(x, self.h, self.O), p)
+        # Do = 100*np.array([1,0,0])
+
+        # Compute do_star/dt
         o_star = p - Do
-        # persistent o_star_prev;
-        # if isempty(o_star_prev)
-        #     o_star_prev = o_star;
-        # end
-        # do_stardt = (o_star - o_star_prev)/dt;
-        # o_star_prev = o_star;
-        do_stardt = 0*np.array([1,0,0])
+        if self.__prev_t is None:
+            self.__prev_t = t - 0.1
+        dt = t - self.__prev_t
+        self.__prev_t = t
+
+        if self.__prev_o_star is None:
+            self.__prev_o_star = o_star
+        do_stardt = (o_star - self.__prev_o_star)/dt
+        self.__prev_o_star = o_star
+        # do_stardt = 0*np.array([1,0,0])
 
         # Field components
         Dlam = Do - self.lam*Do/np.linalg.norm(Do)
@@ -119,6 +147,14 @@ class ObstacleVectorField:
         self.Psi_T = Psi_T
         return Psi
 
+    def obstacle_callback(self, msg):
+        # Convert PointCloud2 message to a list of points
+        point_list = list(pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
+        # Convert list to a NumPy matrix
+        O = np.array(point_list)
+        # rospy.loginfo("Received point cloud with %d points", O.shape[0])
+        self.O = O
+    
     def get_distance_vector(self):
         return self.Do
     
@@ -144,7 +180,7 @@ class VectorField:
     def compute(self, p, t):
         # Compute fields
         curve = self.curve_vector_field.compute(p, t)
-        obstacle = self.obstacle_vector_field.compute(p)
+        obstacle = self.obstacle_vector_field.compute(p, t)
         Do = self.obstacle_vector_field.get_distance_vector()
         do_stardt = self.obstacle_vector_field.get_feedforward_vector()
         # Barrier functions
@@ -162,42 +198,52 @@ class VectorField:
         return F
 
 
-def takeoff():
-    if FLY_DRONE:
-        cf.takeoff(targetHeight=TAKEOFF_HEIGHT, duration=TAKEOFF_DURATION)
-    timeHelper.sleep(TAKEOFF_DURATION + HOVER_DURATION)
+class Experiment:
 
-def control():
-    curve = lambda s,t: np.array([0.6*np.cos(s), 0.6*np.sin(s), 1.0+0*s+0.2*np.cos(0.2*t)]).T
-    vf = VectorField(curve)
-    while not rospy.is_shutdown():
-        p = cf.position()
-        t = timeHelper.time()
-        v = vf.compute(p, t)
-        if FLY_DRONE:
-            cf.cmdVelocityWorld(v, yawRate=0)
-        else:
-            print(v)
-        time.sleep(0.1)
+    TAKEOFF_HEIGHT = 0.6
+    TAKEOFF_DURATION = 2.5
+    HOVER_DURATION = 1.0
+    FLY_DRONE=False
 
-def land():
-    if FLY_DRONE:
-        cf.land(targetHeight=0.04, duration=2.5)
-        timeHelper.sleep(TAKEOFF_DURATION)
-        cf.notifySetpointsStop()
+    def __init__(self):
+        self.swarm = Crazyswarm()
+        self.timeHelper = self.swarm.timeHelper
+        self.cf = self.swarm.allcfs.crazyflies[0]
 
+    def run(self):
+        rospy.init_node('my_controller')
+        curve = lambda s,t: np.array([0.6*np.cos(s), 0.6*np.sin(s), 1.0+0*s+0.2*np.cos(0.2*t)]).T
+        vf = VectorField(curve)
+        rospy.Subscriber("/foamball/pointcloud", PointCloud2, vf.obstacle_vector_field.obstacle_callback)
+        print("Taking off...")
+        self.takeoff()
+        try:
+            print("Controlling...")
+            while not rospy.is_shutdown():
+                p = self.cf.position()
+                t = self.timeHelper.time()
+                v = vf.compute(p, t)
+                if self.FLY_DRONE:
+                    self.cf.cmdVelocityWorld(v, yawRate=0)
+                else:
+                    print(v)
+                time.sleep(0.1)
+        finally:
+            print("Landing...")
+            self.land()
 
-def main():
-    rospy.init_node('my_controller')
-    print("Taking off...")
-    takeoff()
-    try:
-        print("Controlling...")
-        control()
-    finally:
-        print("Landing...")
-        land()
+    def takeoff(self):
+        if self.FLY_DRONE:
+            self.cf.takeoff(targetHeight=self.TAKEOFF_HEIGHT, duration=self.TAKEOFF_DURATION)
+        self.timeHelper.sleep(self.TAKEOFF_DURATION + self.HOVER_DURATION)
+
+    def land(self):
+        if self.FLY_DRONE:
+            self.cf.land(targetHeight=0.04, duration=2.5)
+            self.timeHelper.sleep(self.TAKEOFF_DURATION)
+            self.cf.notifySetpointsStop()
 
 
 if __name__ == "__main__":
-    main()
+    exp = Experiment()
+    exp.run()
