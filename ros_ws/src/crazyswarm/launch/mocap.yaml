@@ -8,7 +8,7 @@ rigid_bodies:
         child_frame_id: foamball/base_link
         parent_frame_id: world
 optitrack_config:
-        multicast_address: 224.0.0.1
+        multicast_address: 239.255.42.99
         command_port: 1510
         data_port: 1511
         enable_optitrack: true
