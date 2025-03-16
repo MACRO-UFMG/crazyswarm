@@ -15,14 +15,17 @@ class FoamBallPointCloudNode:
         self.pcl_pub = rospy.Publisher('/foamball/pointcloud', PointCloud2, queue_size=1)
         
         self.sphere_radius = 0.06  # Radius of the sphere (0.12m diameter)
-        self.num_points = 500  # Number of points in the point cloud
+        self.num_points = 20  # Number of points in the point cloud
         
-        self.timer = rospy.Timer(rospy.Duration(0.1), self.publish_point_cloud)
+        self.timer = rospy.Timer(rospy.Duration(0.01), self.publish_point_cloud)
 
     def generate_sphere_points(self, center):
         """Generates a point cloud representing a sphere around the given center."""
-        phi = np.random.uniform(0, np.pi, self.num_points)
-        theta = np.random.uniform(0, 2 * np.pi, self.num_points)
+        phi = np.linspace(0, np.pi, self.num_points)
+        theta = np.linspace(0, 2 * np.pi, self.num_points)
+
+        phi, theta = np.meshgrid(phi, theta)
+        phi, theta = phi.ravel(), theta.ravel()
         
         x = center[0] + self.sphere_radius * np.sin(phi) * np.cos(theta)
         y = center[1] + self.sphere_radius * np.sin(phi) * np.sin(theta)
@@ -33,7 +36,7 @@ class FoamBallPointCloudNode:
 
     def publish_point_cloud(self, event):
         try:
-            transform: TransformStamped = self.tf_buffer.lookup_transform('world', 'foamball', rospy.Time(0))
+            transform: TransformStamped = self.tf_buffer.lookup_transform('world', 'foamball_corrected', rospy.Time(0))
             position = transform.transform.translation
             
             points = self.generate_sphere_points((position.x, position.y, position.z))
@@ -51,7 +54,7 @@ class FoamBallPointCloudNode:
             cloud = pc2.create_cloud(header, fields, points)
             self.pcl_pub.publish(cloud)
         except tf2_ros.LookupException:
-            rospy.logwarn("Could not lookup transform for foamball.")
+            rospy.logwarn("Could not lookup transform for foamball_corrected.")
         except tf2_ros.ExtrapolationException:
             rospy.logwarn("Extrapolation error while looking up foamball transform.")
 
