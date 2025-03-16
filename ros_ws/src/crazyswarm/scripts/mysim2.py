@@ -5,9 +5,6 @@ import os
 import sys
 import rospy
 
-import sensor_msgs.point_cloud2 as pc2
-from sensor_msgs.msg import PointCloud2
-
 # %% Setup Paths
 # Keep track of the file path
 file_path = os.path.dirname(os.path.realpath(__file__))
@@ -76,7 +73,7 @@ class CurveVectorField:
         # Tangent parameters
         T = (self.parametric_curve(s_star+1e-3,t) - self.parametric_curve(s_star-1e-3,t)) / (2e-3)
         T = T/np.linalg.norm(T)
-        Pi = np.eye(3) - T.dot(T.T)
+        Pi = np.eye(6) - T.dot(T.T)
 
         # Feedforward parameters    
         forward_curve = self.parametric_curve(s,t+self.Ts)
@@ -101,7 +98,7 @@ class CurveVectorField:
 
 class ObstacleVectorField:
     
-    def __init__(self, lam=0.1, M = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), h = 0.15, vr=.25, kG=10):
+    def __init__(self, lam=0.2, M = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), h = 0.15, vr=.25, kG=10):
         self.lam = lam # lambda parameter
         self.M = M
         self.h = h
@@ -148,12 +145,7 @@ class ObstacleVectorField:
         self.Psi_T = Psi_T
         return Psi
 
-    def obstacle_callback(self, msg):
-        # Convert PointCloud2 message to a list of points
-        point_list = list(pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
-        # Convert list to a NumPy matrix
-        O = np.array(point_list).T
-        # rospy.loginfo("Received point cloud with %d points", O.shape[0])
+    def obstacle_callback(self, O):
         self.O = O
     
     def get_distance_vector(self):
@@ -163,12 +155,13 @@ class ObstacleVectorField:
         return self.Psi_T
 
 
+# M = np.array([[0, -1, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 0, 0, -1, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, -1], [0, 0, 0, 0, 1, 0]])
 class VectorField:
 
     def __init__(self,
-                 parametric_curve, Ts=.1, vr=.3, kG=15, # curve field parameters
-                 lam=0.1, M = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), vr_o=.3, kG_o=10, # obstacle field parameters
-                 B_crit=0.05, B_safe=0.15, kB=10 # blending parameters
+                 parametric_curve, Ts=.1, vr=.25, kG=10, # curve field parameters
+                 lam=0.25, M = np.array([[0, -1, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, -1, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 0]]), vr_o=.25, kG_o=10, # obstacle field parameters
+                 B_crit=0.05, B_safe=0.15, kB=20 # blending parameters
                  ):
         self.curve_vector_field = CurveVectorField(parametric_curve, Ts, vr, kG)
         self.obstacle_vector_field = ObstacleVectorField(lam=lam, M=M, vr=vr_o, kG=kG_o)
@@ -199,7 +192,9 @@ class VectorField:
         print("\n--------------------")
         print("obst:", obstacle)
         print("curve", curve)
-        print("Theta", Theta)
+        print("Do", Do)
+        print("|Do|", np.linalg.norm(Do))
+        print("Theta", Theta, Theta1, Theta2)
         print("F", F)
         print('--------------------\n')
         return F
@@ -215,22 +210,30 @@ class Experiment:
     def __init__(self):
         self.swarm = Crazyswarm()
         self.timeHelper = self.swarm.timeHelper
-        self.cf = self.swarm.allcfs.crazyflies[0]
+        self.cf_1 = self.swarm.allcfs.crazyflies[0]
+        self.cf_2 = self.swarm.allcfs.crazyflies[1]
 
     def run(self):
-        curve = lambda s,t: np.array([0.6*np.cos(s), 0.6*np.sin(s), 1.0+0*s+0.2*np.cos(0.2*t)]).T
+        curve = lambda s,t: np.array([0.6*np.cos(-s), 0.6*np.sin(-s), 1.0+0*s+0.2*np.cos(0.2*t),
+                                      0.6*np.cos(s), 0.6*np.sin(s), 1.0+0*s+0.2*np.cos(0.2*t)]).T
         vf = VectorField(curve)
-        rospy.Subscriber("/foamball/pointcloud", PointCloud2, vf.obstacle_vector_field.obstacle_callback)
         print("Taking off...")
         self.takeoff()
         try:
             print("Controlling...")
             while not rospy.is_shutdown():
-                p = self.cf.position()
+                p_1 = self.cf_1.position()
+                p_2 = self.cf_2.position()
+                middle = (p_1 + p_2) / 2
+                O = np.matrix(np.concatenate((middle, middle))).T
+                vf.obstacle_vector_field.obstacle_callback(O)
+                p = np.concatenate((p_1, p_2))
                 t = self.timeHelper.time()
                 v = vf.compute(p, t)
+                v_1, v_2 = np.split(v, 2)
                 if self.FLY_DRONE:
-                    self.cf.cmdVelocityWorld(v, yawRate=0)
+                    self.cf_1.cmdVelocityWorld(v_1, yawRate=0)
+                    self.cf_2.cmdVelocityWorld(v_2, yawRate=0)
                 else:
                     print(v)
                 time.sleep(0.1)
@@ -240,14 +243,17 @@ class Experiment:
 
     def takeoff(self):
         if self.FLY_DRONE:
-            self.cf.takeoff(targetHeight=self.TAKEOFF_HEIGHT, duration=self.TAKEOFF_DURATION)
+            self.cf_1.takeoff(targetHeight=self.TAKEOFF_HEIGHT, duration=self.TAKEOFF_DURATION)
+            self.cf_2.takeoff(targetHeight=self.TAKEOFF_HEIGHT, duration=self.TAKEOFF_DURATION)
         self.timeHelper.sleep(self.TAKEOFF_DURATION + self.HOVER_DURATION)
 
     def land(self):
         if self.FLY_DRONE:
-            self.cf.land(targetHeight=0.04, duration=2.5)
+            self.cf_1.land(targetHeight=0.04, duration=2.5)
+            self.cf_2.land(targetHeight=0.04, duration=2.5)
             self.timeHelper.sleep(self.TAKEOFF_DURATION)
-            self.cf.notifySetpointsStop()
+            self.cf_1.notifySetpointsStop()
+            self.cf_2.notifySetpointsStop()
 
 
 if __name__ == "__main__":
