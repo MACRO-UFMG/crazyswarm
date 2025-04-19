@@ -108,29 +108,30 @@ class ObstacleVectorField:
         self.vr = vr
         self.kG = kG
         self.__prev_t = None
-        self.__prev_o_star = None
+        self.__prev_Do_h_scalar = None
         self.O = np.matrix([])
 
     def compute(self, p, t):
         # Smooth distance
         Do = compute_gradient(lambda x: smooth_distance(x, self.h, self.O), p)
         # Do = 100*np.array([1,0,0])
+        Do_h_scalar = smooth_distance(p, self.h, self.O)
+        B_h = Do_h_scalar - (self.lam**2)/2
 
-        # Compute do_star/dt
-        o_star = p - Do
         if self.__prev_t is None:
             self.__prev_t = t - 0.1
         dt = t - self.__prev_t
         self.__prev_t = t
 
-        if self.__prev_o_star is None:
-            self.__prev_o_star = o_star
-        do_stardt = (o_star - self.__prev_o_star)/dt
-        self.__prev_o_star = o_star
-        # do_stardt = 0*np.array([1,0,0])
+        if self.__prev_Do_h_scalar is None:
+            self.__prev_Do_h_scalar = Do_h_scalar
+        dDo_h_scalardt = (Do_h_scalar - self.__prev_Do_h_scalar)/dt
+        self.__prev_Do_h_scalar = Do_h_scalar
+        # dDo_h_scalar = 0
+        self.dDo_h_scalardt = dDo_h_scalardt
 
         # Field components
-        Dlam = Do - self.lam*Do/np.linalg.norm(Do)
+        Dlam = B_h*Do/np.linalg.norm(Do)
         Tlam = -self.M.dot(Do)
 
         # Modulation parameters
@@ -139,7 +140,7 @@ class ObstacleVectorField:
 
         # Compute field
         Psi_S = -G*Dlam/np.linalg.norm(Dlam+1e-6) + H*Tlam/np.linalg.norm(Tlam+1e-6)
-        Psi_T = do_stardt
+        Psi_T = -Do/(np.linalg.norm(Do)**2)*dDo_h_scalardt
         eta = -Psi_S.dot(Psi_T) + np.sqrt((Psi_S.dot(Psi_T))**2 + self.vr**2 - np.linalg.norm(Psi_T)**2)
         if np.isnan(eta):
             eta = 0
@@ -159,16 +160,15 @@ class ObstacleVectorField:
     def get_distance_vector(self):
         return self.Do
     
-    def get_feedforward_vector(self):
-        return self.Psi_T
-
+    def get_dDo_h_scalardt(self):
+        return self.dDo_h_scalardt
 
 class VectorField:
 
     def __init__(self,
-                 parametric_curve, Ts=.1, vr=.3, kG=15, # curve field parameters
-                 lam=0.1, M = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), vr_o=.3, kG_o=10, # obstacle field parameters
-                 B_crit=0.05, B_safe=0.15, kB=10 # blending parameters
+                 parametric_curve, Ts=.1, vr=.5, kG=10, # curve field parameters
+                 lam=0.1, M = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 0]]), vr_o=.5, kG_o=5, # obstacle field parameters
+                 B_crit=0.01, B_safe=0.1, kB=20 # blending parameters
                  ):
         self.curve_vector_field = CurveVectorField(parametric_curve, Ts, vr, kG)
         self.obstacle_vector_field = ObstacleVectorField(lam=lam, M=M, vr=vr_o, kG=kG_o)
@@ -183,10 +183,10 @@ class VectorField:
         curve = self.curve_vector_field.compute(p, t)
         obstacle = self.obstacle_vector_field.compute(p, t)
         Do = self.obstacle_vector_field.get_distance_vector()
-        do_stardt = self.obstacle_vector_field.get_feedforward_vector()
+        dDo_h_scalardt = self.obstacle_vector_field.get_dDo_h_scalardt()
         # Barrier functions
         B = 0.5*np.linalg.norm(Do)*np.linalg.norm(Do) + 0.5*self.lam*self.lam
-        dot_B = Do.dot(curve - do_stardt)
+        dot_B = Do.dot(curve) + dDo_h_scalardt
         # Blend fields
         Theta1 = min(1,max(0,
                            (B-self.B_crit)/(self.B_safe - self.B_crit)
@@ -245,6 +245,12 @@ class Experiment:
 
     def land(self):
         if self.FLY_DRONE:
+            for i in range(10):
+                p = self.cf.position()
+                p_goal = np.array([p[0], p[1], 0.30])
+                v = 0.1*(p_goal - p)
+                self.cf.cmdVelocityWorld(v, yawRate=0)
+                time.sleep(0.1)
             self.cf.land(targetHeight=0.04, duration=2.5)
             self.timeHelper.sleep(self.TAKEOFF_DURATION)
             self.cf.notifySetpointsStop()
