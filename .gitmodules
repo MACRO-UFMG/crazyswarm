@@ -11,6 +11,3 @@
 [submodule "ros_ws/src/crazyflie_tools"]
 	path = ros_ws/src/crazyflie_tools
 	url = https://github.com/whoenig/crazyflie_tools.git
-[submodule "ros_ws/src/crazyswarm/scripts/CAMPC"]
-	path = ros_ws/src/crazyswarm/scripts/CAMPC
-	url = https://github.com/Vangasse/CAMPC.git
