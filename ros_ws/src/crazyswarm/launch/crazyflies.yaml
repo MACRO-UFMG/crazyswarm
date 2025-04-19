@@ -14,9 +14,9 @@ crazyflies:
 #   - 0.0
 #   type: medium
 - channel: 100
-  id: 5
+  id: 2
   initialPosition:
-  - -0.63
-  - -0.6
+  - 0.0
+  - 0.0
   - 0.0
   type: medium
