@@ -222,21 +222,18 @@ class Experiment:
         vf = VectorField(curve)
         rospy.Subscriber("/foamball/pointcloud", PointCloud2, vf.obstacle_vector_field.obstacle_callback)
         print("Taking off...")
+        rospy.on_shutdown(self.land)
         self.takeoff()
-        try:
-            print("Controlling...")
-            while not rospy.is_shutdown():
-                p = self.cf.position()
-                t = self.timeHelper.time()
-                v = vf.compute(p, t)
-                if self.FLY_DRONE:
-                    self.cf.cmdVelocityWorld(v, yawRate=0)
-                else:
-                    print(v)
-                time.sleep(0.1)
-        finally:
-            print("Landing...")
-            self.land()
+        print("Controlling...")
+        while not rospy.is_shutdown():
+            p = self.cf.position()
+            t = self.timeHelper.time()
+            v = vf.compute(p, t)
+            if self.FLY_DRONE:
+                self.cf.cmdVelocityWorld(v, yawRate=0)
+            else:
+                print(v)
+            time.sleep(0.05)
 
     def takeoff(self):
         if self.FLY_DRONE:
@@ -245,9 +242,10 @@ class Experiment:
 
     def land(self):
         if self.FLY_DRONE:
-            for i in range(10):
+            p = self.cf.position()
+            p_goal = np.array([p[0], p[1], 0.30])
+            for _ in range(50):
                 p = self.cf.position()
-                p_goal = np.array([p[0], p[1], 0.30])
                 v = 0.1*(p_goal - p)
                 self.cf.cmdVelocityWorld(v, yawRate=0)
                 time.sleep(0.1)
